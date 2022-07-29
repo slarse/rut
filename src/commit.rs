@@ -1,7 +1,7 @@
 use std::iter::Peekable;
 use std::path::Component;
-use std::{fs, io, path::PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
+use std::{fs, io, path::PathBuf};
 
 use crate::file;
 use crate::hex::to_hex_string;

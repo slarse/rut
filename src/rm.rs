@@ -1,4 +1,3 @@
-use crate::file;
 use std::path::PathBuf;
 use std::{fs, io};
 
@@ -6,14 +5,7 @@ use crate::{index::Index, workspace::Workspace};
 
 pub fn rm(path: &PathBuf, workspace: &Workspace) -> io::Result<()> {
     let index_file = workspace.git_dir().join("index");
-    let mut index = if index_file.is_file() {
-        let index_bytes = file::read_file(&index_file)?;
-
-        // TODO handle error from reading index
-        Index::from_bytes(&index_bytes).ok().unwrap()
-    } else {
-        Index::new()
-    };
+    let mut index = Index::from_file(&index_file)?;
 
     index.remove(path);
 

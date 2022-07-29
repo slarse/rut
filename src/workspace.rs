@@ -36,6 +36,16 @@ impl Workspace {
     pub fn get_config(&self) -> Config {
         config::read_config().unwrap()
     }
+
+    pub fn relativize_path(&self, absolute_path: &PathBuf) -> PathBuf {
+        let prefix = format!("{}/", self.workdir().as_os_str().to_str().unwrap());
+        let relative_path = absolute_path.strip_prefix(prefix).expect("Bad path");
+        if relative_path.as_os_str() == "" {
+            PathBuf::from(".")
+        } else {
+            PathBuf::from(relative_path)
+        }
+    }
 }
 
 pub struct Database {

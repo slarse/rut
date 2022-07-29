@@ -8,7 +8,7 @@ use std::{
     str,
 };
 
-use rut::{add, commit, init};
+use rut::{add, commit, index::Index, init};
 
 use rut::workspace::{Database, Workspace};
 
@@ -32,8 +32,8 @@ fn test_creating_commit_with_nested_directory() -> io::Result<()> {
     init::init(&workspace.git_dir())?;
     let database = Database::new(workspace.git_dir());
 
-    add_file(&readme, &workspace, &database);
-    add_file(&file_in_nested_dir, &workspace, &database);
+    rut_add(&readme, &workspace, &database);
+    rut_add(&file_in_nested_dir, &workspace, &database);
 
     commit("Initial commit", &workspace, &database)?;
 
@@ -57,12 +57,12 @@ fn test_second_commit_gets_proper_parent() -> io::Result<()> {
     init::init(&workspace.git_dir())?;
     let database = Database::new(workspace.git_dir());
 
-    add_file(&readme, &workspace, &database);
+    rut_add(&readme, &workspace, &database);
 
     let first_commit_sha = commit("First commit", &workspace, &database)?;
 
     fs::write(&readme, "Second commit content")?;
-    add_file(&readme, &workspace, &database);
+    rut_add(&readme, &workspace, &database);
     let second_commit_sha = commit("Second commit", &workspace, &database)?;
 
     assert_ne!(first_commit_sha, second_commit_sha);
@@ -78,15 +78,55 @@ fn test_second_commit_gets_proper_parent() -> io::Result<()> {
     Ok(())
 }
 
+#[test]
+fn test_add_directory() -> io::Result<()> {
+    // arrange
+    let workdir = create_temporary_directory();
+
+    let readme = workdir.join("README.md");
+    let nested_dir = workdir.join("nested");
+    let file_in_nested_dir = nested_dir.join("file.txt");
+
+    fs::create_dir(&nested_dir)?;
+    fs::write(&readme, "A README.")?;
+    fs::write(&file_in_nested_dir, "A file.")?;
+
+    // act
+    let workspace = Workspace::new(workdir);
+    init::init(&workspace.git_dir())?;
+    let database = Database::new(workspace.git_dir());
+
+    rut_add(workspace.workdir(), &workspace, &database);
+
+    // assert
+    let index = Index::from_file(&workspace.git_dir().join("index"))?;
+    let paths_in_index: Vec<&PathBuf> = index
+        .get_entries()
+        .iter()
+        .map(|entry| &entry.path)
+        .collect();
+
+    let expected_paths: Vec<PathBuf> = ["README.md", "nested/file.txt"]
+        .iter()
+        .map(|path| PathBuf::from(path))
+        .collect();
+
+    assert_eq!(
+        paths_in_index,
+        expected_paths.iter().collect::<Vec<&PathBuf>>()
+    );
+
+    Ok(())
+}
+
 fn commit(commit_message: &str, workspace: &Workspace, database: &Database) -> io::Result<String> {
     fs::write(&workspace.git_dir().join("COMMIT_EDITMSG"), commit_message)?;
     commit::commit(&workspace, &database)?;
     Ok(get_head_commit(&workspace.git_dir()))
 }
 
-fn add_file(path: &PathBuf, workspace: &Workspace, database: &Database) {
-    let relative_path = PathBuf::from(path.strip_prefix(workspace.workdir()).expect("Bad path"));
-    add::add(relative_path, &workspace, &database).expect("Failed to add file");
+fn rut_add(path: &PathBuf, workspace: &Workspace, database: &Database) {
+    add::add(path.to_owned(), &workspace, &database).expect("Failed to add file");
 }
 
 fn get_head_commit(git_dir: &PathBuf) -> String {

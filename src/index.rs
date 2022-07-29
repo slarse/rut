@@ -1,9 +1,11 @@
 use std::collections::HashMap;
 use std::fs::Metadata;
+use std::io;
 use std::os::linux::fs::MetadataExt;
 use std::path::PathBuf;
 use std::str;
 
+use crate::file;
 use crate::hashing;
 use crate::hex;
 
@@ -65,6 +67,19 @@ impl Index {
         }
 
         Ok(Index { entries })
+    }
+
+    pub fn from_file(path: &PathBuf) -> io::Result<Index> {
+        let index = if path.is_file() {
+            let index_bytes = file::read_file(path)?;
+
+            // TODO handle error from reading index
+            Index::from_bytes(&index_bytes).ok().unwrap()
+        } else {
+            Index::new()
+        };
+
+        Ok(index)
     }
 
     fn parse_entry(bytes: &[u8]) -> Result<(IndexEntry, usize), String> {

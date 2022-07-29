@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 sha1 = "0.10"
 flate2 = "1.0"
+walkdir = "2"
 
 [[bin]]
 name = "rut"
