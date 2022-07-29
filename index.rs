@@ -273,21 +273,7 @@ mod tests {
 
     #[test]
     fn test_single_entry_index_round_trip() {
-        let object_id: Vec<u8> = (0..10).cycle().take(40).collect();
-        let entry = IndexEntry {
-            ctime_seconds: 1657658046,
-            ctime_nanoseconds: 444900053,
-            mtime_seconds: 1657658046,
-            mtime_nanoseconds: 444900053,
-            dev: 65026,
-            ino: 3831260,
-            mode: 33188,
-            uid: 1000,
-            gid: 985,
-            file_size: 262,
-            path: PathBuf::from("Cargo.toml"),
-            object_id,
-        };
+        let entry = create_entry("Cargo.toml");
 
         let index = Index {
             entries: vec![entry],
