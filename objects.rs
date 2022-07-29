@@ -2,6 +2,7 @@ use std::{fmt::Display, path::PathBuf, str};
 
 use crate::hashing;
 use crate::hex::{self, unhexlify};
+use crate::index::FileMode;
 
 pub trait GitObject<'a> {
     fn id(&'a self) -> Vec<u8>;
@@ -50,19 +51,21 @@ fn to_object_format(object_type: &str, bytes: &[u8]) -> Vec<u8> {
     object_format
 }
 
+#[derive(Debug)]
 pub struct TreeEntry {
     pub name: String,
     pub object_id: Vec<u8>,
+    pub mode: FileMode,
 }
 
 impl TreeEntry {
-    pub fn new(path: &PathBuf, object_id: Vec<u8>) -> TreeEntry {
+    pub fn new(path: &PathBuf, object_id: Vec<u8>, mode: FileMode) -> TreeEntry {
         let name = path
             .file_name()
             .and_then(|name| name.to_str())
             .and_then(|name| Some(name.to_owned()))
             .unwrap();
-        TreeEntry { name, object_id }
+        TreeEntry { name, object_id, mode }
     }
 }
 
@@ -78,6 +81,10 @@ impl Tree {
             entries: mutable_entries,
         }
     }
+
+    pub fn entries(&self) -> &[TreeEntry] {
+        &self.entries[..]
+    }
 }
 
 impl<'a> GitObject<'a> for Tree {
@@ -89,12 +96,17 @@ impl<'a> GitObject<'a> for Tree {
 
     fn to_object_format(&self) -> Vec<u8> {
         let mut bytes = Vec::new();
-        let mode = "100644 ".as_bytes();
-
         for entry in self.entries.iter() {
             let name_bytes = entry.name.as_bytes();
 
-            bytes.extend_from_slice(mode);
+            let mode = match entry.mode {
+                FileMode::Directory => "40000",
+                FileMode::Regular => "100644",
+                FileMode::Executable => "100755",
+            };
+
+            bytes.extend_from_slice(mode.as_bytes());
+            bytes.extend_from_slice(" ".as_bytes());
             bytes.extend_from_slice(name_bytes);
             bytes.push(0);
             bytes.extend_from_slice(&hex::hexlify(&entry.object_id));

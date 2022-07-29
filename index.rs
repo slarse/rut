@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 use std::fs;
-use std::fs::Metadata;
 use std::io;
 use std::os::linux::fs::MetadataExt;
 use std::path::PathBuf;
@@ -46,16 +45,6 @@ fn to_be_u16(bytes: &[u8]) -> Result<u16, String> {
     Ok(result)
 }
 
-fn get_mode(metadata: &Metadata) -> u32 {
-    let actual_mode = metadata.st_mode();
-    let world_executable_bits = 0o700 as u32;
-    if actual_mode & world_executable_bits == world_executable_bits {
-        0o100755
-    } else {
-        0o100644
-    }
-}
-
 impl Index {
     pub fn new() -> Index {
         Index {
@@ -94,7 +83,7 @@ impl Index {
         position += BYTES_PER_U32;
         let ino = to_be_u32(&bytes[position..(position + BYTES_PER_U32)])?;
         position += BYTES_PER_U32;
-        let mode = to_be_u32(&bytes[position..(position + BYTES_PER_U32)])?;
+        let mode = Mode::new(to_be_u32(&bytes[position..(position + BYTES_PER_U32)])?);
         position += BYTES_PER_U32;
         let uid = to_be_u32(&bytes[position..(position + BYTES_PER_U32)])?;
         position += BYTES_PER_U32;
@@ -178,7 +167,7 @@ pub struct IndexEntry {
     pub mtime_nanoseconds: u32,
     pub dev: u32,
     pub ino: u32,
-    pub mode: u32,
+    mode: Mode,
     pub uid: u32,
     pub gid: u32,
     pub file_size: u32,
@@ -196,7 +185,7 @@ impl IndexEntry {
         let mtime_nanoseconds = metadata.st_mtime_nsec() as u32;
         let dev = metadata.st_dev() as u32;
         let ino = metadata.st_ino() as u32;
-        let mode = get_mode(&metadata);
+        let mode = Mode::new(metadata.st_mode());
         let uid = metadata.st_uid() as u32;
         let gid = metadata.st_gid() as u32;
         let file_size = metadata.st_size() as u32;
@@ -226,7 +215,7 @@ impl IndexEntry {
         add_all(self.mtime_nanoseconds, &mut bytes);
         add_all(self.dev, &mut bytes);
         add_all(self.ino, &mut bytes);
-        add_all(self.mode, &mut bytes);
+        add_all(self.mode.raw_mode, &mut bytes);
         add_all(self.uid, &mut bytes);
         add_all(self.gid, &mut bytes);
         add_all(self.file_size, &mut bytes);
@@ -243,6 +232,34 @@ impl IndexEntry {
         pad_to_block_size(&mut bytes);
 
         bytes
+    }
+
+    pub fn file_mode(&self) -> FileMode {
+        self.mode.file_mode
+    }
+}
+
+#[derive(Eq, PartialEq, Debug, Copy, Clone)]
+pub enum FileMode {
+    Directory,
+    Executable,
+    Regular,
+}
+
+#[derive(Eq, PartialEq, Debug)]
+struct Mode {
+    file_mode: FileMode,
+    raw_mode: u32,
+}
+
+impl Mode {
+    fn new(actual_mode: u32) -> Mode {
+        let world_executable_bits = 0o700 as u32;
+        if actual_mode & world_executable_bits == world_executable_bits {
+            Mode { file_mode: FileMode::Executable, raw_mode: 0o100755 }
+        } else {
+            Mode{ file_mode: FileMode::Regular, raw_mode: 0o100644 }
+        }
     }
 }
 
