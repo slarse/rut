@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::fs;
+use std::fs::Metadata;
 use std::io;
 use std::os::linux::fs::MetadataExt;
 use std::path::PathBuf;
@@ -43,6 +44,16 @@ fn to_be_u16(bytes: &[u8]) -> Result<u16, String> {
         result |= (*byte as u16) << (1 - index) * 8;
     }
     Ok(result)
+}
+
+fn get_mode(metadata: &Metadata) -> u32 {
+    let actual_mode = metadata.st_mode();
+    let world_executable_bits = 0o700 as u32;
+    if actual_mode & world_executable_bits == world_executable_bits {
+        0o100755
+    } else {
+        0o100644
+    }
 }
 
 impl Index {
@@ -185,7 +196,7 @@ impl IndexEntry {
         let mtime_nanoseconds = metadata.st_mtime_nsec() as u32;
         let dev = metadata.st_dev() as u32;
         let ino = metadata.st_ino() as u32;
-        let mode = metadata.st_mode() as u32;
+        let mode = get_mode(&metadata);
         let uid = metadata.st_uid() as u32;
         let gid = metadata.st_gid() as u32;
         let file_size = metadata.st_size() as u32;
