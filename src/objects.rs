@@ -138,6 +138,7 @@ pub struct Commit<'a> {
     pub author: &'a Author,
     pub message: &'a str,
     pub parent: Option<&'a str>,
+    pub timestamp: u64,
 }
 
 impl<'a> GitObject<'a> for Commit<'a> {
@@ -150,17 +151,25 @@ impl<'a> GitObject<'a> for Commit<'a> {
     fn to_object_format(&self) -> Vec<u8> {
         let tree_string = hex::to_hex_string(&self.tree.id());
 
+        // TODO get timezone from system
+        let timezone = "+0200";
+        let author_with_timestamp = format!("{} {} {}", self.author, self.timestamp, timezone);
+
         let content = match self.parent {
             Some(parent) => {
                 format!(
                     "tree {}\nparent {}\nauthor {}\ncommitter {}\n\n{}",
-                    &tree_string, parent, self.author, self.author, self.message
+                    &tree_string,
+                    parent,
+                    author_with_timestamp,
+                    author_with_timestamp,
+                    self.message
                 )
             }
             None => {
                 format!(
                     "tree {}\nauthor {}\ncommitter {}\n\n{}",
-                    &tree_string, self.author, self.author, self.message
+                    &tree_string, author_with_timestamp, author_with_timestamp, self.message
                 )
             }
         };

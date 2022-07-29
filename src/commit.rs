@@ -1,6 +1,7 @@
 use std::iter::Peekable;
 use std::path::Component;
 use std::{fs, io, path::PathBuf};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::file;
 use crate::hex::to_hex_string;
@@ -34,11 +35,17 @@ pub fn commit(workspace: &Workspace, database: &Database) -> io::Result<()> {
     let ref_handler = RefHandler::new(&workspace);
     let parent_commit = ref_handler.deref(&head_ref).ok();
 
+    let time = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+
     let commit = Commit {
         tree: &root_tree,
         author: &author,
         message: &commit_msg,
         parent: parent_commit.as_deref(),
+        timestamp: time,
     };
 
     database.store_object(&commit)?;
