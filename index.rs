@@ -10,6 +10,10 @@ use crate::hex;
 const SIGNATURE: &str = "DIRC";
 const VERSION: [u8; 4] = [0, 0, 0, 2];
 
+const BYTES_PER_U32: usize = 4;
+const BYTES_PER_U16: usize = 2;
+const BYTES_PER_PACKED_OID: usize = 20;
+
 #[derive(Debug, PartialEq, Eq)]
 pub struct Index {
     entries: Vec<IndexEntry>,
@@ -49,70 +53,72 @@ impl Index {
         let preamble_end = SIGNATURE.len() + VERSION.len();
 
         let num_entries = to_be_u32(&bytes[preamble_end..(preamble_end + 4)])?;
+        let mut entries = Vec::with_capacity(num_entries as usize);
+
         let mut position = preamble_end + 4;
-
-        let mut entries = Vec::new();
-
         for _ in 0..num_entries {
-            let start_position = position;
-
-            let ctime_seconds = to_be_u32(&bytes[position..(position + 4)])?;
-            position += 4;
-            let ctime_nanoseconds = to_be_u32(&bytes[position..(position + 4)])?;
-            position += 4;
-            let mtime_seconds = to_be_u32(&bytes[position..(position + 4)])?;
-            position += 4;
-            let mtime_nanoseconds = to_be_u32(&bytes[position..(position + 4)])?;
-            position += 4;
-            let dev = to_be_u32(&bytes[position..(position + 4)])?;
-            position += 4;
-            let ino = to_be_u32(&bytes[position..(position + 4)])?;
-            position += 4;
-            let mode = to_be_u32(&bytes[position..(position + 4)])?;
-            position += 4;
-            let uid = to_be_u32(&bytes[position..(position + 4)])?;
-            position += 4;
-            let gid = to_be_u32(&bytes[position..(position + 4)])?;
-            position += 4;
-            let file_size = to_be_u32(&bytes[position..(position + 4)])?;
-            position += 4;
-            let object_id = hex::unhexlify(&bytes[position..(position + 20)]);
-            position += 20;
-
-            let path_size = to_be_u16(&bytes[position..(position + 2)])? as usize;
-            position += 2;
-
-            // TODO fix error handling of parsing path
-            let path = std::str::from_utf8(&bytes[position..(position + path_size)])
-                .ok()
-                .unwrap();
-
-            let entry = IndexEntry {
-                ctime_seconds,
-                ctime_nanoseconds,
-                mtime_seconds,
-                mtime_nanoseconds,
-                dev,
-                ino,
-                mode,
-                uid,
-                gid,
-                file_size,
-                path: PathBuf::from(path),
-                object_id,
-            };
-
-            let unpadded_entry_size = (position - start_position) + path_size + 1;
-            let entry_padding = 8 - unpadded_entry_size % 8;
-            let entry_total_size = unpadded_entry_size + entry_padding;
-            let entry_end = start_position + entry_total_size;
-
-            position = entry_end;
-
+            let (entry, consumed_bytes) = Index::parse_entry(&bytes[position..])?;
+            position += consumed_bytes;
             entries.push(entry);
         }
 
         Ok(Index { entries })
+    }
+
+    fn parse_entry(bytes: &[u8]) -> Result<(IndexEntry, usize), String> {
+        let mut position = 0;
+
+        let ctime_seconds = to_be_u32(&bytes[position..(position + BYTES_PER_U32)])?;
+        position += BYTES_PER_U32;
+        let ctime_nanoseconds = to_be_u32(&bytes[position..(position + BYTES_PER_U32)])?;
+        position += BYTES_PER_U32;
+        let mtime_seconds = to_be_u32(&bytes[position..(position + BYTES_PER_U32)])?;
+        position += BYTES_PER_U32;
+        let mtime_nanoseconds = to_be_u32(&bytes[position..(position + BYTES_PER_U32)])?;
+        position += BYTES_PER_U32;
+        let dev = to_be_u32(&bytes[position..(position + BYTES_PER_U32)])?;
+        position += BYTES_PER_U32;
+        let ino = to_be_u32(&bytes[position..(position + BYTES_PER_U32)])?;
+        position += BYTES_PER_U32;
+        let mode = to_be_u32(&bytes[position..(position + BYTES_PER_U32)])?;
+        position += BYTES_PER_U32;
+        let uid = to_be_u32(&bytes[position..(position + BYTES_PER_U32)])?;
+        position += BYTES_PER_U32;
+        let gid = to_be_u32(&bytes[position..(position + BYTES_PER_U32)])?;
+        position += BYTES_PER_U32;
+        let file_size = to_be_u32(&bytes[position..(position + BYTES_PER_U32)])?;
+        position += BYTES_PER_U32;
+        let object_id = hex::unhexlify(&bytes[position..(position + BYTES_PER_PACKED_OID)]);
+        position += BYTES_PER_PACKED_OID;
+
+        let path_size = to_be_u16(&bytes[position..(position + BYTES_PER_U16)])? as usize;
+        position += BYTES_PER_U16;
+
+        // TODO fix error handling of parsing path
+        let path = std::str::from_utf8(&bytes[position..(position + path_size)])
+            .ok()
+            .unwrap();
+
+        let entry = IndexEntry {
+            ctime_seconds,
+            ctime_nanoseconds,
+            mtime_seconds,
+            mtime_nanoseconds,
+            dev,
+            ino,
+            mode,
+            uid,
+            gid,
+            file_size,
+            path: PathBuf::from(path),
+            object_id,
+        };
+
+        let unpadded_entry_size = position + path_size + 1;
+        let entry_padding = 8 - unpadded_entry_size % 8;
+        let entry_total_size = unpadded_entry_size + entry_padding;
+
+        Ok((entry, entry_total_size))
     }
 
     pub fn add_entry(&mut self, entry: IndexEntry) {
