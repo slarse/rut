@@ -30,6 +30,7 @@ pub mod cli {
 
 pub mod workspace {
     use std::fs;
+    use std::fs::OpenOptions;
     use std::io;
     use std::io::prelude::*;
     use std::path::PathBuf;
@@ -106,10 +107,17 @@ pub mod workspace {
             let dirname = hex::to_hex_string(&object_id[..2]);
             let filename = hex::to_hex_string(&object_id[2..]);
             let dirpath = self.git_dir.join("objects").join(dirname);
-            fs::create_dir(&dirpath)?;
+            fs::create_dir_all(&dirpath)?;
 
             let compressed_bytes = Database::compress(&mut content)?;
-            fs::write(dirpath.join(filename), &compressed_bytes)?;
+            if let Some(mut file) = OpenOptions::new()
+                .create_new(true)
+                .write(true)
+                .open(dirpath.join(&filename))
+                .ok()
+            {
+                file.write_all(&compressed_bytes)?;
+            }
 
             Ok(())
         }
@@ -191,17 +199,31 @@ pub mod commit {
         let commit_msg = fs::read_to_string(workspace.git_dir().join("COMMIT_EDITMSG"))
             .expect("failed to read commit message");
 
+        let parent_commit = fs::read_to_string(workspace.git_dir().join("HEAD")).ok();
+
         let commit = Commit {
             tree: &root_tree,
             author: &author,
             message: &commit_msg,
+            parent: parent_commit.as_deref(),
         };
 
         database.store_object(&commit)?;
-        let first_line = commit_msg.split("\n").next().expect("Not a single line in the commit message");
-        println!("[(root-commit) {}] {}", to_hex_string(&commit.id()), first_line);
 
-        fs::write(workspace.git_dir().join("HEAD"), to_hex_string(&commit.id()))?;
+        let first_line = commit_msg
+            .split("\n")
+            .next()
+            .expect("Not a single line in the commit message");
+        println!(
+            "[(root-commit) {}] {}",
+            to_hex_string(&commit.id()),
+            first_line
+        );
+
+        fs::write(
+            workspace.git_dir().join("HEAD"),
+            to_hex_string(&commit.id()),
+        )?;
 
         Ok(())
     }
@@ -332,6 +354,7 @@ pub mod objects {
         pub tree: &'a Tree,
         pub author: &'a Author,
         pub message: &'a str,
+        pub parent: Option<&'a str>,
     }
 
     impl<'a> GitObject<'a> for Commit<'a> {
@@ -343,10 +366,22 @@ pub mod objects {
 
         fn to_object_format(&self) -> Vec<u8> {
             let tree_string = hex::to_hex_string(&self.tree.id());
-            let content = format!(
-                "tree {}\nauthor {}\ncommitter {}\n\n{}",
-                &tree_string, self.author, self.author, self.message
-            );
+
+            let content = match self.parent {
+                Some(parent) => {
+                    format!(
+                        "tree {}\nparent {}\nauthor {}\ncommitter {}\n\n{}",
+                        &tree_string, parent, self.author, self.author, self.message
+                    )
+                }
+                None => {
+                    format!(
+                        "tree {}\nauthor {}\ncommitter {}\n\n{}",
+                        &tree_string, self.author, self.author, self.message
+                    )
+                }
+            };
+
             to_object_format("commit", &content.as_bytes())
         }
     }
