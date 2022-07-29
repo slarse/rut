@@ -48,58 +48,71 @@ impl Index {
     pub fn from_bytes(bytes: &[u8]) -> Result<Index, String> {
         let preamble_end = SIGNATURE.len() + VERSION.len();
 
-        // TODO use num_entries to get more than one entry
-        let _num_entries = to_be_u32(&bytes[preamble_end..(preamble_end + 4)])?;
-
+        let num_entries = to_be_u32(&bytes[preamble_end..(preamble_end + 4)])?;
         let mut position = preamble_end + 4;
 
-        let ctime_seconds = to_be_u32(&bytes[position..(position + 4)])?;
-        position += 4;
-        let ctime_nanoseconds = to_be_u32(&bytes[position..(position + 4)])?;
-        position += 4;
-        let mtime_seconds = to_be_u32(&bytes[position..(position + 4)])?;
-        position += 4;
-        let mtime_nanoseconds = to_be_u32(&bytes[position..(position + 4)])?;
-        position += 4;
-        let dev = to_be_u32(&bytes[position..(position + 4)])?;
-        position += 4;
-        let ino = to_be_u32(&bytes[position..(position + 4)])?;
-        position += 4;
-        let mode = to_be_u32(&bytes[position..(position + 4)])?;
-        position += 4;
-        let uid = to_be_u32(&bytes[position..(position + 4)])?;
-        position += 4;
-        let gid = to_be_u32(&bytes[position..(position + 4)])?;
-        position += 4;
-        let file_size = to_be_u32(&bytes[position..(position + 4)])?;
-        position += 4;
-        let object_id = hex::unhexlify(&bytes[position..(position + 20)]);
-        position += 20;
+        let mut entries = Vec::new();
 
-        let path_size = to_be_u16(&bytes[position..(position + 2)])?;
-        position += 2;
+        for _ in 0..num_entries {
+            let start_position = position;
 
-        // TODO fix error handling of parsing path
-        let path = std::str::from_utf8(&bytes[position..(position + path_size as usize)])
-            .ok()
-            .unwrap();
+            let ctime_seconds = to_be_u32(&bytes[position..(position + 4)])?;
+            position += 4;
+            let ctime_nanoseconds = to_be_u32(&bytes[position..(position + 4)])?;
+            position += 4;
+            let mtime_seconds = to_be_u32(&bytes[position..(position + 4)])?;
+            position += 4;
+            let mtime_nanoseconds = to_be_u32(&bytes[position..(position + 4)])?;
+            position += 4;
+            let dev = to_be_u32(&bytes[position..(position + 4)])?;
+            position += 4;
+            let ino = to_be_u32(&bytes[position..(position + 4)])?;
+            position += 4;
+            let mode = to_be_u32(&bytes[position..(position + 4)])?;
+            position += 4;
+            let uid = to_be_u32(&bytes[position..(position + 4)])?;
+            position += 4;
+            let gid = to_be_u32(&bytes[position..(position + 4)])?;
+            position += 4;
+            let file_size = to_be_u32(&bytes[position..(position + 4)])?;
+            position += 4;
+            let object_id = hex::unhexlify(&bytes[position..(position + 20)]);
+            position += 20;
 
-        let entry = IndexEntry {
-            ctime_seconds,
-            ctime_nanoseconds,
-            mtime_seconds,
-            mtime_nanoseconds,
-            dev,
-            ino,
-            mode,
-            uid,
-            gid,
-            file_size,
-            path: PathBuf::from(path),
-            object_id,
-        };
+            let path_size = to_be_u16(&bytes[position..(position + 2)])? as usize;
+            position += 2;
 
-        Ok(Index { entries: vec![entry] })
+            // TODO fix error handling of parsing path
+            let path = std::str::from_utf8(&bytes[position..(position + path_size)])
+                .ok()
+                .unwrap();
+
+            let entry = IndexEntry {
+                ctime_seconds,
+                ctime_nanoseconds,
+                mtime_seconds,
+                mtime_nanoseconds,
+                dev,
+                ino,
+                mode,
+                uid,
+                gid,
+                file_size,
+                path: PathBuf::from(path),
+                object_id,
+            };
+
+            let unpadded_entry_size = (position - start_position) + path_size + 1;
+            let entry_padding = 8 - unpadded_entry_size % 8;
+            let entry_total_size = unpadded_entry_size + entry_padding;
+            let entry_end = start_position + entry_total_size;
+
+            position = entry_end;
+
+            entries.push(entry);
+        }
+
+        Ok(Index { entries })
     }
 
     pub fn add_entry(&mut self, entry: IndexEntry) {
@@ -242,7 +255,7 @@ mod tests {
     }
 
     #[test]
-    fn test_index_round_trip() {
+    fn test_single_entry_index_round_trip() {
         let object_id: Vec<u8> = (0..10).cycle().take(40).collect();
         let entry = IndexEntry {
             ctime_seconds: 1657658046,
@@ -264,6 +277,21 @@ mod tests {
         };
         let index_bytes = index.as_vec();
 
+        let index_from_bytes = Index::from_bytes(&index_bytes).ok().unwrap();
+
+        assert_eq!(index_from_bytes, index);
+    }
+
+    #[test]
+    fn test_dual_entry_index_round_trip() {
+        let first_entry = create_entry("Cargo.toml");
+        let second_entry = create_entry("README.md");
+
+        let mut index = Index::new();
+        index.add_entry(first_entry);
+        index.add_entry(second_entry);
+
+        let index_bytes = index.as_vec();
         let index_from_bytes = Index::from_bytes(&index_bytes).ok().unwrap();
 
         assert_eq!(index_from_bytes, index);
@@ -348,6 +376,24 @@ mod tests {
         ];
 
         assert_vectors_equal(&entry.as_vec(), &expected_vec);
+    }
+
+    fn create_entry(path: &str) -> IndexEntry {
+        let object_id: Vec<u8> = (0..10).cycle().take(40).collect();
+        IndexEntry {
+            ctime_seconds: 1657658046,
+            ctime_nanoseconds: 444900053,
+            mtime_seconds: 1657658046,
+            mtime_nanoseconds: 444900053,
+            dev: 65026,
+            ino: 3831260,
+            mode: 33188,
+            uid: 1000,
+            gid: 985,
+            file_size: 262,
+            path: PathBuf::from(path),
+            object_id,
+        }
     }
 
     fn assert_vectors_equal<T: Debug + Eq>(actual: &Vec<T>, expected: &Vec<T>) {
