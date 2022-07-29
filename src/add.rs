@@ -14,11 +14,13 @@ pub fn add(path: PathBuf, workspace: &Workspace, database: &Database) -> io::Res
         return Ok(());
     }
 
-    let file_bytes = file::read_file(&path)?;
+    let absolute_path = workspace.workdir().join(&path);
+    let file_bytes = file::read_file(&absolute_path)?;
     let blob = Blob::new(file_bytes);
     database.store_object(&blob)?;
 
-    let entry = IndexEntry::new(path, blob.id())?;
+    let metadata = fs::metadata(&absolute_path)?;
+    let entry = IndexEntry::new(path, blob.id(), &metadata);
 
     let index_file = workspace.git_dir().join("index");
     let mut index = if index_file.is_file() {

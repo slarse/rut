@@ -6,6 +6,7 @@ use crate::file;
 use crate::hex::to_hex_string;
 use crate::index::{FileMode, Index, IndexEntry};
 use crate::objects::{Author, Commit, GitObject, Tree, TreeEntry};
+use crate::refs::RefHandler;
 use crate::workspace::{Database, Workspace};
 
 pub fn commit(workspace: &Workspace, database: &Database) -> io::Result<()> {
@@ -28,7 +29,10 @@ pub fn commit(workspace: &Workspace, database: &Database) -> io::Result<()> {
     let commit_msg = fs::read_to_string(workspace.git_dir().join("COMMIT_EDITMSG"))
         .expect("failed to read commit message");
 
-    let parent_commit = fs::read_to_string(workspace.git_dir().join("HEAD")).ok();
+    let head_ref = parse_head(workspace.git_dir().join("HEAD")).expect("HEAD does not exist");
+
+    let ref_handler = RefHandler::new(&workspace);
+    let parent_commit = ref_handler.deref(&head_ref).ok();
 
     let commit = Commit {
         tree: &root_tree,
@@ -58,11 +62,17 @@ pub fn commit(workspace: &Workspace, database: &Database) -> io::Result<()> {
     );
 
     fs::write(
-        workspace.git_dir().join("HEAD"),
+        workspace.git_dir().join(head_ref),
         to_hex_string(&commit.id()),
     )?;
 
     Ok(())
+}
+
+fn parse_head(head: PathBuf) -> io::Result<String> {
+    let head_content = fs::read_to_string(&head)?;
+    let trimmed_head_content = head_content.trim();
+    Ok(trimmed_head_content.trim_start_matches("ref: ").to_owned())
 }
 
 fn build_tree(entries: &[&IndexEntry]) -> (Tree, Vec<Tree>) {

@@ -1,6 +1,5 @@
 use std::collections::HashMap;
-use std::fs;
-use std::io;
+use std::fs::Metadata;
 use std::os::linux::fs::MetadataExt;
 use std::path::PathBuf;
 use std::str;
@@ -181,9 +180,7 @@ pub struct IndexEntry {
 }
 
 impl IndexEntry {
-    pub fn new(path: PathBuf, object_id: Vec<u8>) -> io::Result<IndexEntry> {
-        let metadata = fs::metadata(&path)?;
-
+    pub fn new(path: PathBuf, object_id: Vec<u8>, metadata: &Metadata) -> IndexEntry {
         let ctime_seconds = metadata.st_ctime() as u32;
         let ctime_nanoseconds = metadata.st_ctime_nsec() as u32;
         let mtime_seconds = metadata.st_mtime() as u32;
@@ -195,7 +192,7 @@ impl IndexEntry {
         let gid = metadata.st_gid() as u32;
         let file_size = metadata.st_size() as u32;
 
-        Ok(IndexEntry {
+        IndexEntry {
             ctime_seconds,
             ctime_nanoseconds,
             mtime_seconds,
@@ -208,7 +205,7 @@ impl IndexEntry {
             file_size,
             path,
             object_id,
-        })
+        }
     }
 
     pub fn as_vec(&self) -> Vec<u8> {

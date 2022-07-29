@@ -73,6 +73,7 @@ impl TreeEntry {
     }
 }
 
+#[derive(Debug)]
 pub struct Tree {
     entries: Vec<TreeEntry>,
 }
