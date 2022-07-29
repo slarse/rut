@@ -3,6 +3,43 @@ use std::io::Result;
 use std::os::linux::fs::MetadataExt;
 use std::path::PathBuf;
 
+use crate::hashing;
+use crate::hex;
+
+pub struct Index {
+    entries: Vec<IndexEntry>,
+}
+
+impl Index {
+    pub fn new() -> Index {
+        Index { entries: vec![] }
+    }
+
+    pub fn add_entry(&mut self, entry: IndexEntry) {
+        self.entries.push(entry)
+    }
+
+    pub fn as_vec(&self) -> Vec<u8> {
+        let signature = "DIRC".as_bytes();
+        let version: [u8; 4] = [0, 0, 0, 2];
+        let num_entries = (self.entries.len() as u32).to_be_bytes();
+
+        let mut index: Vec<u8> = Vec::new();
+        index.extend_from_slice(signature);
+        index.extend_from_slice(&version);
+        index.extend_from_slice(&num_entries);
+
+        for entry in &self.entries {
+            index.extend(entry.as_vec());
+        }
+
+        let index_checksum = hashing::sha1_hash(&index);
+        index.extend_from_slice(&index_checksum);
+
+        index
+    }
+}
+
 pub struct IndexEntry {
     ctime_seconds: u32,
     ctime_nanoseconds: u32,
@@ -15,10 +52,11 @@ pub struct IndexEntry {
     gid: u32,
     file_size: u32,
     path: PathBuf,
+    object_id: Vec<u8>,
 }
 
 impl IndexEntry {
-    pub fn new(path: PathBuf) -> Result<IndexEntry> {
+    pub fn new(path: PathBuf, object_id: Vec<u8>) -> Result<IndexEntry> {
         let metadata = fs::metadata(&path)?;
 
         let ctime_seconds = metadata.st_ctime() as u32;
@@ -44,6 +82,7 @@ impl IndexEntry {
             gid,
             file_size,
             path,
+            object_id,
         })
     }
 
@@ -60,17 +99,20 @@ impl IndexEntry {
         add_all(self.uid, &mut bytes);
         add_all(self.gid, &mut bytes);
         add_all(self.file_size, &mut bytes);
+        hex::hexlify(&self.object_id)
+            .into_iter()
+            .for_each(|byte| bytes.push(byte));
 
         let path_bytes = self.path.to_str().unwrap().as_bytes().to_vec();
         let path_length = (path_bytes.len() as u16).to_be_bytes().to_vec();
         path_length.into_iter().for_each(|byte| bytes.push(byte));
         path_bytes.into_iter().for_each(|byte| bytes.push(byte));
+        bytes.push(0);
 
         pad_to_block_size(&mut bytes);
 
         bytes
     }
-
 }
 
 fn pad_to_block_size(bytes: &mut Vec<u8>) {
@@ -95,6 +137,8 @@ mod tests {
 
     #[test]
     fn test_as_vec() {
+        let object_id_byte: u8 = 123;
+        let object_id: Vec<u8> = vec![object_id_byte];
         let entry = IndexEntry {
             ctime_seconds: 1657658046,
             ctime_nanoseconds: 444900053,
@@ -107,12 +151,66 @@ mod tests {
             gid: 985,
             file_size: 262,
             path: PathBuf::from("Cargo.toml"),
+            object_id,
         };
 
         let expected_vec: Vec<u8> = vec![
-            98, 205, 218, 190, 26, 132, 162, 213, 98, 205, 218, 190, 26, 132, 162, 213, 0, 0, 254,
-            2, 0, 58, 117, 220, 0, 0, 129, 164, 0, 0, 3, 232, 0, 0, 3, 217, 0, 0, 1, 6, 0, 10, 67,
-            97, 114, 103, 111, 46, 116, 111, 109, 108, 0, 0, 0, 0,
+            98,
+            205,
+            218,
+            190,
+            26,
+            132,
+            162,
+            213,
+            98,
+            205,
+            218,
+            190,
+            26,
+            132,
+            162,
+            213,
+            0,
+            0,
+            254,
+            2,
+            0,
+            58,
+            117,
+            220,
+            0,
+            0,
+            129,
+            164,
+            0,
+            0,
+            3,
+            232,
+            0,
+            0,
+            3,
+            217,
+            0,
+            0,
+            1,
+            6,
+            object_id_byte,
+            0,
+            10,
+            67,
+            97,
+            114,
+            103,
+            111,
+            46,
+            116,
+            111,
+            109,
+            108,
+            0,
+            0,
+            0,
         ];
 
         assert_vectors_equal(&entry.as_vec(), &expected_vec);

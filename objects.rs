@@ -1,7 +1,7 @@
 use std::{fmt::Display, path::PathBuf, str};
 
 use crate::hex::{self, unhexlify};
-use sha1::{Digest, Sha1};
+use crate::hashing;
 
 pub trait GitObject<'a> {
     fn id(&'a self) -> Vec<u8>;
@@ -17,7 +17,7 @@ pub struct Blob {
 impl Blob {
     pub fn new(bytes: Vec<u8>) -> Blob {
         let object_format = to_object_format("blob", &bytes);
-        let id = hash(&object_format);
+        let id = hashing::sha1_hash(&object_format);
 
         Blob {
             bytes,
@@ -79,7 +79,7 @@ impl Tree {
 impl<'a> GitObject<'a> for Tree {
     fn id(&'a self) -> Vec<u8> {
         let object_format = self.to_object_format();
-        let hash = hash(&object_format);
+        let hash = hashing::sha1_hash(&object_format);
         unhexlify(&hash)
     }
 
@@ -98,12 +98,6 @@ impl<'a> GitObject<'a> for Tree {
 
         to_object_format("tree", &bytes)
     }
-}
-
-fn hash(bytes: &[u8]) -> Vec<u8> {
-    let mut hasher = Sha1::new();
-    hasher.update(bytes);
-    hasher.finalize().to_vec()
 }
 
 pub struct Author {
@@ -128,7 +122,7 @@ pub struct Commit<'a> {
 impl<'a> GitObject<'a> for Commit<'a> {
     fn id(&self) -> Vec<u8> {
         let object_format = self.to_object_format();
-        let hash = hash(&object_format);
+        let hash = hashing::sha1_hash(&object_format);
         unhexlify(&hash)
     }
 

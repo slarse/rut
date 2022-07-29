@@ -15,3 +15,5 @@ pub mod hex;
 pub mod index;
 
 pub mod add;
+
+pub mod hashing;
