@@ -9,9 +9,5 @@ edition = "2021"
 sha1 = "0.10"
 flate2 = "1.0"
 
-[lib]
-path = "lib.rs"
-
 [[bin]]
 name = "rut"
-path = "bin.rs"

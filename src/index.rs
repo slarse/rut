@@ -137,7 +137,9 @@ impl Index {
     }
 
     pub fn get_entries(&self) -> Vec<&IndexEntry> {
-        self.entries.values().collect()
+        let mut entries: Vec<&IndexEntry> = self.entries.values().collect();
+        entries.sort_by(|lhs, rhs| lhs.path.cmp(&rhs.path));
+        entries
     }
 
     pub fn as_vec(&self) -> Vec<u8> {
@@ -149,10 +151,9 @@ impl Index {
         index.extend_from_slice(&VERSION);
         index.extend_from_slice(&num_entries);
 
-        let mut sorted_entries: Vec<&IndexEntry> = self.get_entries();
-        sorted_entries.sort_by(|lhs, rhs| lhs.path.cmp(&rhs.path));
+        let entries = self.get_entries();
 
-        for entry in sorted_entries {
+        for entry in entries {
             index.extend(entry.as_vec());
         }
 
@@ -260,9 +261,15 @@ impl Mode {
     fn new(actual_mode: u32) -> Mode {
         let world_executable_bits = 0o700 as u32;
         if actual_mode & world_executable_bits == world_executable_bits {
-            Mode { file_mode: FileMode::Executable, raw_mode: 0o100755 }
+            Mode {
+                file_mode: FileMode::Executable,
+                raw_mode: 0o100755,
+            }
         } else {
-            Mode{ file_mode: FileMode::Regular, raw_mode: 0o100644 }
+            Mode {
+                file_mode: FileMode::Regular,
+                raw_mode: 0o100644,
+            }
         }
     }
 }

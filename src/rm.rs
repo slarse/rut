@@ -1,6 +1,6 @@
-use std::{io, fs};
-use std::path::PathBuf;
 use crate::file;
+use std::path::PathBuf;
+use std::{fs, io};
 
 use crate::{index::Index, workspace::Workspace};
 

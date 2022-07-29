@@ -122,7 +122,8 @@ fn build_tree_from_tmp_entries(entries: impl Iterator<Item = TmpEntry>) -> (Tree
                     }
                 })
                 .collect();
-            let (root_tree, containing_trees) = build_tree_from_tmp_entries(tmp_entries.into_iter());
+            let (root_tree, containing_trees) =
+                build_tree_from_tmp_entries(tmp_entries.into_iter());
             let tree_entry = TreeEntry::new(
                 &PathBuf::from(prefix.as_os_str()),
                 root_tree.id(),

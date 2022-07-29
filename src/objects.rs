@@ -65,7 +65,11 @@ impl TreeEntry {
             .and_then(|name| name.to_str())
             .and_then(|name| Some(name.to_owned()))
             .unwrap();
-        TreeEntry { name, object_id, mode }
+        TreeEntry {
+            name,
+            object_id,
+            mode,
+        }
     }
 }
 
