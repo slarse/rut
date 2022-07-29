@@ -47,7 +47,9 @@ fn to_be_u16(bytes: &[u8]) -> Result<u16, String> {
 
 impl Index {
     pub fn new() -> Index {
-        Index { entries: HashMap::new() }
+        Index {
+            entries: HashMap::new(),
+        }
     }
 
     pub fn from_bytes(bytes: &[u8]) -> Result<Index, String> {

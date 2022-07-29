@@ -1,10 +1,10 @@
 use std::{fs, io, path::PathBuf};
 
 use crate::{
+    file,
     index::{Index, IndexEntry},
     objects::{Blob, GitObject},
     workspace::{Database, Workspace},
-    file,
 };
 
 static GITIGNORE: [&str; 1] = ["Cargo.lock"];
