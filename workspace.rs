@@ -12,8 +12,6 @@ use crate::config::Config;
 use crate::hex;
 use crate::objects::GitObject;
 
-static GITIGNORE: &'static [&str] = &["Cargo.lock"];
-
 pub struct Workspace {
     workdir: PathBuf,
 }
@@ -37,23 +35,6 @@ impl Workspace {
 
     pub fn get_config(&self) -> Config {
         config::read_config().unwrap()
-    }
-
-    pub fn list_files(&self) -> io::Result<impl Iterator<Item = PathBuf>> {
-        let file_paths = fs::read_dir(self.workdir())?
-            .map(|res| res.map(|e| e.path()))
-            .flatten()
-            .filter(|path| path.is_file())
-            .filter(|path| {
-                for ignored_file in GITIGNORE.iter() {
-                    if path.ends_with(ignored_file) {
-                        return false;
-                    }
-                }
-                true
-            });
-
-        Ok(file_paths)
     }
 }
 

@@ -1,29 +1,22 @@
-use std::{fs, fs::File, io, io::Read};
+use std::{fs, io};
 
+use crate::file;
 use crate::hex::to_hex_string;
-use crate::objects::{Author, Blob, Commit, GitObject, Tree, TreeEntry};
+use crate::index::Index;
+use crate::objects::{Author, Commit, GitObject, Tree, TreeEntry};
 use crate::workspace::{Database, Workspace};
 
 pub fn commit(workspace: &Workspace, database: &Database) -> io::Result<()> {
-    let mut blobs = Vec::new();
-    let mut tree_entries = Vec::new();
+    let index_bytes = file::read_file(&workspace.git_dir().join("index"))?;
 
-    let file_paths = workspace.list_files()?;
-    for path in file_paths {
-        let mut file = File::open(&path)?;
-        let mut bytes: Vec<u8> = Vec::new();
-        file.read_to_end(&mut bytes)?;
+    // TODO handle index parse error
+    let index = Index::from_bytes(&index_bytes).expect("Could not parse index");
 
-        let blob = Blob::new(bytes);
-        let tree_entry = TreeEntry::new(&path, blob.id());
-
-        blobs.push(blob);
-        tree_entries.push(tree_entry);
-    }
-
-    for blob in blobs {
-        database.store_object(&blob)?;
-    }
+    let tree_entries = index
+        .get_entries()
+        .iter()
+        .map(|entry| TreeEntry::new(&entry.path, entry.object_id[..].to_vec()))
+        .collect();
 
     let root_tree = Tree::new(tree_entries);
     database.store_object(&root_tree)?;

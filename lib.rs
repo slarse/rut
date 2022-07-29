@@ -17,3 +17,5 @@ pub mod index;
 pub mod add;
 
 pub mod hashing;
+
+mod file;

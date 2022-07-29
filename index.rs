@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::fs;
 use std::io;
 use std::os::linux::fs::MetadataExt;
@@ -16,7 +17,7 @@ const BYTES_PER_PACKED_OID: usize = 20;
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct Index {
-    entries: Vec<IndexEntry>,
+    entries: HashMap<PathBuf, IndexEntry>,
 }
 
 fn to_be_u32(bytes: &[u8]) -> Result<u32, String> {
@@ -46,20 +47,20 @@ fn to_be_u16(bytes: &[u8]) -> Result<u16, String> {
 
 impl Index {
     pub fn new() -> Index {
-        Index { entries: vec![] }
+        Index { entries: HashMap::new() }
     }
 
     pub fn from_bytes(bytes: &[u8]) -> Result<Index, String> {
         let preamble_end = SIGNATURE.len() + VERSION.len();
 
         let num_entries = to_be_u32(&bytes[preamble_end..(preamble_end + 4)])?;
-        let mut entries = Vec::with_capacity(num_entries as usize);
+        let mut entries = HashMap::new();
 
         let mut position = preamble_end + 4;
         for _ in 0..num_entries {
             let (entry, consumed_bytes) = Index::parse_entry(&bytes[position..])?;
             position += consumed_bytes;
-            entries.push(entry);
+            entries.insert(PathBuf::from(&entry.path), entry);
         }
 
         Ok(Index { entries })
@@ -126,11 +127,11 @@ impl Index {
     }
 
     pub fn add_entry(&mut self, entry: IndexEntry) {
-        self.entries.push(entry)
+        self.entries.insert(PathBuf::from(&entry.path), entry);
     }
 
-    pub fn get_entries(&self) -> &[IndexEntry] {
-        &self.entries
+    pub fn get_entries(&self) -> Vec<&IndexEntry> {
+        self.entries.values().collect()
     }
 
     pub fn as_vec(&self) -> Vec<u8> {
@@ -142,7 +143,7 @@ impl Index {
         index.extend_from_slice(&VERSION);
         index.extend_from_slice(&num_entries);
 
-        let mut sorted_entries: Vec<&IndexEntry> = self.entries.iter().collect();
+        let mut sorted_entries: Vec<&IndexEntry> = self.get_entries();
         sorted_entries.sort_by(|lhs, rhs| lhs.path.cmp(&rhs.path));
 
         for entry in sorted_entries {
@@ -158,18 +159,18 @@ impl Index {
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct IndexEntry {
-    ctime_seconds: u32,
-    ctime_nanoseconds: u32,
-    mtime_seconds: u32,
-    mtime_nanoseconds: u32,
-    dev: u32,
-    ino: u32,
-    mode: u32,
-    uid: u32,
-    gid: u32,
-    file_size: u32,
-    path: PathBuf,
-    object_id: Vec<u8>,
+    pub ctime_seconds: u32,
+    pub ctime_nanoseconds: u32,
+    pub mtime_seconds: u32,
+    pub mtime_nanoseconds: u32,
+    pub dev: u32,
+    pub ino: u32,
+    pub mode: u32,
+    pub uid: u32,
+    pub gid: u32,
+    pub file_size: u32,
+    pub path: PathBuf,
+    pub object_id: Vec<u8>,
 }
 
 impl IndexEntry {
@@ -275,9 +276,8 @@ mod tests {
     fn test_single_entry_index_round_trip() {
         let entry = create_entry("Cargo.toml");
 
-        let index = Index {
-            entries: vec![entry],
-        };
+        let mut index = Index::new();
+        index.add_entry(entry);
         let index_bytes = index.as_vec();
 
         let index_from_bytes = Index::from_bytes(&index_bytes).ok().unwrap();
@@ -298,28 +298,6 @@ mod tests {
         let index_from_bytes = Index::from_bytes(&index_bytes).ok().unwrap();
 
         assert_eq!(index_from_bytes, index);
-    }
-
-    #[test]
-    fn test_index_entries_sorted_by_path() {
-        let first_entry = create_entry("README.md");
-        let second_entry = create_entry("Cargo.toml");
-        let expected_path_order = vec!["Cargo.toml", "README.md"];
-
-        let mut index = Index::new();
-        index.add_entry(first_entry);
-        index.add_entry(second_entry);
-
-        let index_bytes = index.as_vec();
-        let index_from_bytes = Index::from_bytes(&index_bytes).ok().unwrap();
-
-        let actual_pathnames: Vec<&str> = index_from_bytes
-            .get_entries()
-            .iter()
-            .map(|entry| entry.path.to_str().unwrap())
-            .collect();
-
-        assert_eq!(actual_pathnames, expected_path_order);
     }
 
     #[test]

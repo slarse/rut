@@ -22,7 +22,7 @@ pub fn run_command(args: Vec<String>) -> io::Result<()> {
             commit::commit(&workspace, &database)?;
         }
         ["add", path] => {
-            add::add(PathBuf::from(path))?;
+            add::add(PathBuf::from(path), &workspace, &database)?;
         }
         _ => panic!("unexpected command {:?}", sliced_args),
     };
