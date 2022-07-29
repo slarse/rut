@@ -1,13 +1,43 @@
 use std::fs;
-use std::io::Result;
+use std::io;
 use std::os::linux::fs::MetadataExt;
 use std::path::PathBuf;
+use std::str;
 
 use crate::hashing;
 use crate::hex;
 
+const SIGNATURE: &str = "DIRC";
+const VERSION: [u8; 4] = [0, 0, 0, 2];
+
+#[derive(Debug, PartialEq, Eq)]
 pub struct Index {
     entries: Vec<IndexEntry>,
+}
+
+fn to_be_u32(bytes: &[u8]) -> Result<u32, String> {
+    if bytes.len() != 4 {
+        return Err(format!("Expected 4 bytes, but got {:?}", bytes));
+    }
+
+    let mut result: u32 = 0;
+    for (index, byte) in bytes.iter().enumerate() {
+        result |= (*byte as u32) << (3 - index) * 8;
+    }
+
+    Ok(result)
+}
+
+fn to_be_u16(bytes: &[u8]) -> Result<u16, String> {
+    if bytes.len() != 2 {
+        return Err(format!("Expected 2 bytes, but got {:?}", bytes));
+    }
+
+    let mut result: u16 = 0;
+    for (index, byte) in bytes.iter().enumerate() {
+        result |= (*byte as u16) << (1 - index) * 8;
+    }
+    Ok(result)
 }
 
 impl Index {
@@ -15,18 +45,74 @@ impl Index {
         Index { entries: vec![] }
     }
 
+    pub fn from_bytes(bytes: &[u8]) -> Result<Index, String> {
+        let preamble_end = SIGNATURE.len() + VERSION.len();
+
+        // TODO use num_entries to get more than one entry
+        let _num_entries = to_be_u32(&bytes[preamble_end..(preamble_end + 4)])?;
+
+        let mut position = preamble_end + 4;
+
+        let ctime_seconds = to_be_u32(&bytes[position..(position + 4)])?;
+        position += 4;
+        let ctime_nanoseconds = to_be_u32(&bytes[position..(position + 4)])?;
+        position += 4;
+        let mtime_seconds = to_be_u32(&bytes[position..(position + 4)])?;
+        position += 4;
+        let mtime_nanoseconds = to_be_u32(&bytes[position..(position + 4)])?;
+        position += 4;
+        let dev = to_be_u32(&bytes[position..(position + 4)])?;
+        position += 4;
+        let ino = to_be_u32(&bytes[position..(position + 4)])?;
+        position += 4;
+        let mode = to_be_u32(&bytes[position..(position + 4)])?;
+        position += 4;
+        let uid = to_be_u32(&bytes[position..(position + 4)])?;
+        position += 4;
+        let gid = to_be_u32(&bytes[position..(position + 4)])?;
+        position += 4;
+        let file_size = to_be_u32(&bytes[position..(position + 4)])?;
+        position += 4;
+        let object_id = hex::unhexlify(&bytes[position..(position + 20)]);
+        position += 20;
+
+        let path_size = to_be_u16(&bytes[position..(position + 2)])?;
+        position += 2;
+
+        // TODO fix error handling of parsing path
+        let path = std::str::from_utf8(&bytes[position..(position + path_size as usize)])
+            .ok()
+            .unwrap();
+
+        let entry = IndexEntry {
+            ctime_seconds,
+            ctime_nanoseconds,
+            mtime_seconds,
+            mtime_nanoseconds,
+            dev,
+            ino,
+            mode,
+            uid,
+            gid,
+            file_size,
+            path: PathBuf::from(path),
+            object_id,
+        };
+
+        Ok(Index { entries: vec![entry] })
+    }
+
     pub fn add_entry(&mut self, entry: IndexEntry) {
         self.entries.push(entry)
     }
 
     pub fn as_vec(&self) -> Vec<u8> {
-        let signature = "DIRC".as_bytes();
-        let version: [u8; 4] = [0, 0, 0, 2];
+        let signature = SIGNATURE.as_bytes();
         let num_entries = (self.entries.len() as u32).to_be_bytes();
 
         let mut index: Vec<u8> = Vec::new();
         index.extend_from_slice(signature);
-        index.extend_from_slice(&version);
+        index.extend_from_slice(&VERSION);
         index.extend_from_slice(&num_entries);
 
         for entry in &self.entries {
@@ -40,6 +126,7 @@ impl Index {
     }
 }
 
+#[derive(Debug, PartialEq, Eq)]
 pub struct IndexEntry {
     ctime_seconds: u32,
     ctime_nanoseconds: u32,
@@ -56,7 +143,7 @@ pub struct IndexEntry {
 }
 
 impl IndexEntry {
-    pub fn new(path: PathBuf, object_id: Vec<u8>) -> Result<IndexEntry> {
+    pub fn new(path: PathBuf, object_id: Vec<u8>) -> io::Result<IndexEntry> {
         let metadata = fs::metadata(&path)?;
 
         let ctime_seconds = metadata.st_ctime() as u32;
@@ -136,9 +223,56 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_to_be_u32() {
+        let expected: u32 = 99999;
+        let bytes = expected.to_be_bytes();
+
+        let actual = to_be_u32(&bytes).ok().unwrap();
+
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn test_to_be_u32_error_on_bad_byte_count() {
+        let bytes: [u8; 3] = [0, 1, 2];
+
+        let error = to_be_u32(&bytes).err().unwrap();
+
+        assert_eq!(error, "Expected 4 bytes, but got [0, 1, 2]");
+    }
+
+    #[test]
+    fn test_index_round_trip() {
+        let object_id: Vec<u8> = (0..10).cycle().take(40).collect();
+        let entry = IndexEntry {
+            ctime_seconds: 1657658046,
+            ctime_nanoseconds: 444900053,
+            mtime_seconds: 1657658046,
+            mtime_nanoseconds: 444900053,
+            dev: 65026,
+            ino: 3831260,
+            mode: 33188,
+            uid: 1000,
+            gid: 985,
+            file_size: 262,
+            path: PathBuf::from("Cargo.toml"),
+            object_id,
+        };
+
+        let index = Index {
+            entries: vec![entry],
+        };
+        let index_bytes = index.as_vec();
+
+        let index_from_bytes = Index::from_bytes(&index_bytes).ok().unwrap();
+
+        assert_eq!(index_from_bytes, index);
+    }
+
+    #[test]
     fn test_as_vec() {
-        let object_id_byte: u8 = 123;
-        let object_id: Vec<u8> = vec![object_id_byte];
+        let object_id = vec![1, 2];
+        let hexlified_object_id = hex::hexlify(&object_id).get(0).unwrap().to_owned();
         let entry = IndexEntry {
             ctime_seconds: 1657658046,
             ctime_nanoseconds: 444900053,
@@ -195,7 +329,7 @@ mod tests {
             0,
             1,
             6,
-            object_id_byte,
+            hexlified_object_id,
             0,
             10,
             67,
@@ -225,11 +359,11 @@ mod tests {
             );
         }
 
-        for (actual, expected) in actual.iter().zip(expected.iter()) {
+        for (index, (actual, expected)) in actual.iter().zip(expected.iter()).enumerate() {
             if actual != expected {
                 panic!(
-                    "mismatching characters, expected={:?}, actual={:?}",
-                    expected, actual
+                    "mismatching characters at index {}, expected={:?}, actual={:?}",
+                    index, expected, actual
                 );
             }
         }
