@@ -6,6 +6,10 @@ use crate::hex::{self, unhexlify};
 pub trait GitObject<'a> {
     fn id(&'a self) -> Vec<u8>;
 
+    fn short_id(&'a self) -> Vec<u8> {
+        self.id()[0..7].to_vec()
+    }
+
     fn to_object_format(&self) -> Vec<u8>;
 }
 

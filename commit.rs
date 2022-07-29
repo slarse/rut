@@ -54,7 +54,7 @@ pub fn commit(workspace: &Workspace, database: &Database) -> io::Result<()> {
     println!(
         "[{}{}] {}",
         root_commit_notice,
-        to_hex_string(&commit.id()),
+        to_hex_string(&commit.short_id()),
         first_line
     );
 
