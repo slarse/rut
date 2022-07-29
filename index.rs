@@ -132,6 +132,10 @@ impl Index {
         self.entries.insert(PathBuf::from(&entry.path), entry);
     }
 
+    pub fn remove(&mut self, path: &PathBuf) -> Option<IndexEntry> {
+        self.entries.remove(path)
+    }
+
     pub fn get_entries(&self) -> Vec<&IndexEntry> {
         self.entries.values().collect()
     }

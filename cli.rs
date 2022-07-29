@@ -1,5 +1,5 @@
 use crate::{
-    add, commit, init,
+    add, commit, init, rm,
     workspace::{Database, Workspace},
 };
 use std::env;
@@ -23,6 +23,9 @@ pub fn run_command(args: Vec<String>) -> io::Result<()> {
         }
         ["add", path] => {
             add::add(PathBuf::from(path), &workspace, &database)?;
+        }
+        ["rm", path] => {
+            rm::rm(&PathBuf::from(path), &workspace)?;
         }
         _ => panic!("unexpected command {:?}", sliced_args),
     };
