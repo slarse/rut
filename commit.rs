@@ -44,8 +44,16 @@ pub fn commit(workspace: &Workspace, database: &Database) -> io::Result<()> {
         .split("\n")
         .next()
         .expect("Not a single line in the commit message");
+
+    let root_commit_notice = if parent_commit.is_some() {
+        ""
+    } else {
+        "(root commit) "
+    };
+
     println!(
-        "[(root-commit) {}] {}",
+        "[{}{}] {}",
+        root_commit_notice,
         to_hex_string(&commit.id()),
         first_line
     );
