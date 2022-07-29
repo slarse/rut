@@ -1,7 +1,8 @@
 use crate::{
-    commit, init,
+    add, commit, init,
     workspace::{Database, Workspace},
 };
+use std::path::PathBuf;
 use std::env;
 use std::io;
 
@@ -19,6 +20,9 @@ pub fn run_command(args: Vec<String>) -> io::Result<()> {
         }
         ["commit"] => {
             commit::commit(&workspace, &database)?;
+        }
+        ["add", path] => {
+            add::add(PathBuf::from(path))?;
         }
         _ => panic!("unexpected command {:?}", sliced_args),
     };
