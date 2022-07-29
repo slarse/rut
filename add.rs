@@ -1,6 +1,9 @@
 use std::{fs, fs::File, io, io::Read, path::PathBuf};
 
-use crate::{index::{IndexEntry, Index}, objects::{Blob, GitObject}};
+use crate::{
+    index::{Index, IndexEntry},
+    objects::{Blob, GitObject},
+};
 
 pub fn add(path: PathBuf) -> io::Result<()> {
     let mut file = File::open(&path)?;

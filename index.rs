@@ -115,7 +115,11 @@ impl Index {
         };
 
         let unpadded_entry_size = position + path_size + 1;
-        let entry_padding = 8 - unpadded_entry_size % 8;
+        let entry_padding = if unpadded_entry_size % 8 != 0 {
+            8 - unpadded_entry_size % 8
+        } else {
+            0
+        };
         let entry_total_size = unpadded_entry_size + entry_padding;
 
         Ok((entry, entry_total_size))
@@ -123,6 +127,10 @@ impl Index {
 
     pub fn add_entry(&mut self, entry: IndexEntry) {
         self.entries.push(entry)
+    }
+
+    pub fn get_entries(&self) -> &[IndexEntry] {
+        &self.entries
     }
 
     pub fn as_vec(&self) -> Vec<u8> {
@@ -134,7 +142,10 @@ impl Index {
         index.extend_from_slice(&VERSION);
         index.extend_from_slice(&num_entries);
 
-        for entry in &self.entries {
+        let mut sorted_entries: Vec<&IndexEntry> = self.entries.iter().collect();
+        sorted_entries.sort_by(|lhs, rhs| lhs.path.cmp(&rhs.path));
+
+        for entry in sorted_entries {
             index.extend(entry.as_vec());
         }
 
@@ -301,6 +312,28 @@ mod tests {
         let index_from_bytes = Index::from_bytes(&index_bytes).ok().unwrap();
 
         assert_eq!(index_from_bytes, index);
+    }
+
+    #[test]
+    fn test_index_entries_sorted_by_path() {
+        let first_entry = create_entry("README.md");
+        let second_entry = create_entry("Cargo.toml");
+        let expected_path_order = vec!["Cargo.toml", "README.md"];
+
+        let mut index = Index::new();
+        index.add_entry(first_entry);
+        index.add_entry(second_entry);
+
+        let index_bytes = index.as_vec();
+        let index_from_bytes = Index::from_bytes(&index_bytes).ok().unwrap();
+
+        let actual_pathnames: Vec<&str> = index_from_bytes
+            .get_entries()
+            .iter()
+            .map(|entry| entry.path.to_str().unwrap())
+            .collect();
+
+        assert_eq!(actual_pathnames, expected_path_order);
     }
 
     #[test]

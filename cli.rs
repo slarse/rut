@@ -2,9 +2,9 @@ use crate::{
     add, commit, init,
     workspace::{Database, Workspace},
 };
-use std::path::PathBuf;
 use std::env;
 use std::io;
+use std::path::PathBuf;
 
 pub fn run_command(args: Vec<String>) -> io::Result<()> {
     let sliced_args: Vec<&str> = args.iter().skip(1).map(|s| s.as_str()).collect();

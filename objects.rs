@@ -1,7 +1,7 @@
 use std::{fmt::Display, path::PathBuf, str};
 
-use crate::hex::{self, unhexlify};
 use crate::hashing;
+use crate::hex::{self, unhexlify};
 
 pub trait GitObject<'a> {
     fn id(&'a self) -> Vec<u8>;
