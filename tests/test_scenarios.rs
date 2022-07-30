@@ -8,7 +8,7 @@ use std::{
     str,
 };
 
-use rut::{add, commit, index::Index, init};
+use rut::{add, commit, index::Index, init, rm};
 
 use rut::workspace::{Database, Workspace};
 
@@ -119,6 +119,48 @@ fn test_add_directory() -> io::Result<()> {
     Ok(())
 }
 
+#[test]
+fn test_remove_file() -> io::Result<()> {
+    // arrange
+    let workdir = create_temporary_directory();
+
+    let readme = workdir.join("README.md");
+    let file_txt = workdir.join("file.txt");
+
+    fs::write(&readme, "A README.")?;
+    fs::write(&file_txt, "A file.")?;
+
+    let workspace = Workspace::new(workdir);
+    init::init(&workspace.git_dir())?;
+    let database = Database::new(workspace.git_dir());
+
+    rut_add(workspace.workdir(), &workspace, &database);
+    commit("Initial commit", &workspace, &database)?;
+
+    // act
+    rut_rm(&readme, &workspace);
+
+    // assert
+    let index = Index::from_file(&workspace.git_dir().join("index"))?;
+    let paths_in_index: Vec<&PathBuf> = index
+        .get_entries()
+        .iter()
+        .map(|entry| &entry.path)
+        .collect();
+
+    let expected_paths: Vec<PathBuf> = ["file.txt"]
+        .iter()
+        .map(|path| PathBuf::from(path))
+        .collect();
+
+    assert_eq!(
+        paths_in_index,
+        expected_paths.iter().collect::<Vec<&PathBuf>>()
+    );
+
+    Ok(())
+}
+
 fn commit(commit_message: &str, workspace: &Workspace, database: &Database) -> io::Result<String> {
     fs::write(&workspace.git_dir().join("COMMIT_EDITMSG"), commit_message)?;
     commit::commit(&workspace, &database)?;
@@ -127,6 +169,10 @@ fn commit(commit_message: &str, workspace: &Workspace, database: &Database) -> i
 
 fn rut_add(path: &PathBuf, workspace: &Workspace, database: &Database) {
     add::add(path.to_owned(), &workspace, &database).expect("Failed to add file");
+}
+
+fn rut_rm(path: &PathBuf, workspace: &Workspace) {
+    rm::rm(path, workspace).expect("Failed to remove file");
 }
 
 fn get_head_commit(git_dir: &PathBuf) -> String {

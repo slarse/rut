@@ -20,6 +20,6 @@ pub mod hashing;
 
 mod file;
 
-mod rm;
+pub mod rm;
 
 mod refs;
