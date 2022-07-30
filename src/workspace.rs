@@ -1,5 +1,4 @@
 use std::fs;
-use std::fs::OpenOptions;
 use std::io;
 use std::io::prelude::*;
 use std::path::PathBuf;
@@ -9,6 +8,7 @@ use flate2::Compression;
 
 use crate::config;
 use crate::config::Config;
+use crate::file;
 use crate::hex;
 use crate::objects::GitObject;
 
@@ -67,13 +67,9 @@ impl Database {
         fs::create_dir_all(&dirpath)?;
 
         let compressed_bytes = Database::compress(&mut content)?;
-        if let Some(mut file) = OpenOptions::new()
-            .create_new(true)
-            .write(true)
-            .open(dirpath.join(&filename))
-            .ok()
-        {
-            file.write_all(&compressed_bytes)?;
+        let object_filepath = dirpath.join(&filename);
+        if !object_filepath.exists() {
+            file::atomic_write(&object_filepath, &compressed_bytes)?;
         }
 
         Ok(())

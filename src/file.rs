@@ -13,6 +13,26 @@ pub fn read_file(path: &PathBuf) -> io::Result<Vec<u8>> {
 }
 
 /**
+ * Atomically write to a file by first writing to a temporary file and then renaming it to the
+ * target file.
+ */
+pub fn atomic_write(path: &PathBuf, mut content: &[u8]) -> io::Result<()> {
+    let mut buffer_file = PathBuf::from(path);
+    let buffer_file_extension = format!(
+        "{}.rut-tmp-buffer",
+        buffer_file
+            .extension()
+            .map(|extension| extension.to_str())
+            .flatten()
+            .unwrap_or("ext")
+    );
+    buffer_file.set_extension(buffer_file_extension);
+
+    fs::write(&buffer_file, &mut content)?;
+    fs::rename(&buffer_file, &path)
+}
+
+/**
  * Struct that enables synchronized atomic writing to files. On acquiring with a lock with
  * [`LockFile::acquire`] an empty lockfile is created in the file system. You can then use
  * [`LockFile::write`] to write content to the lockfile.
