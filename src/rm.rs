@@ -1,6 +1,6 @@
-use std::path::PathBuf;
-use std::io;
 use crate::file::LockFile;
+use std::io;
+use std::path::PathBuf;
 
 use crate::{index::Index, workspace::Workspace};
 

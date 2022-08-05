@@ -1,7 +1,9 @@
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::fs::Metadata;
 use std::io;
 use std::os::linux::fs::MetadataExt;
+use std::path::Path;
 use std::path::PathBuf;
 use std::str;
 
@@ -19,6 +21,7 @@ const BYTES_PER_PACKED_OID: usize = 20;
 #[derive(Debug, PartialEq, Eq)]
 pub struct Index {
     entries: HashMap<PathBuf, IndexEntry>,
+    directories: HashMap<PathBuf, HashSet<String>>,
 }
 
 fn to_be_u32(bytes: &[u8]) -> Result<u32, String> {
@@ -50,27 +53,31 @@ impl Index {
     pub fn new() -> Index {
         Index {
             entries: HashMap::new(),
+            directories: HashMap::new(),
         }
     }
 
     pub fn from_bytes(bytes: &[u8]) -> Result<Index, String> {
         let preamble_end = SIGNATURE.len() + VERSION.len();
-
         let num_entries = to_be_u32(&bytes[preamble_end..(preamble_end + 4)])?;
-        let mut entries = HashMap::new();
+
+        let mut index = Index {
+            entries: HashMap::new(),
+            directories: HashMap::new(),
+        };
 
         let mut position = preamble_end + 4;
         for _ in 0..num_entries {
             let (entry, consumed_bytes) = Index::parse_entry(&bytes[position..])?;
             position += consumed_bytes;
-            entries.insert(PathBuf::from(&entry.path), entry);
+            index.add_entry(entry);
         }
 
-        Ok(Index { entries })
+        Ok(index)
     }
 
-    pub fn from_file(path: &PathBuf) -> io::Result<Index> {
-        let index = if path.is_file() {
+    pub fn from_file<P: AsRef<Path>>(path: P) -> io::Result<Index> {
+        let index = if path.as_ref().is_file() {
             let index_bytes = file::read_file(path)?;
 
             // TODO handle error from reading index
@@ -143,11 +150,76 @@ impl Index {
     }
 
     pub fn add_entry(&mut self, entry: IndexEntry) {
+        self.discard_conflicting_entries(&entry.path);
+        self.insert_into_directories_map(&entry.path);
         self.entries.insert(PathBuf::from(&entry.path), entry);
     }
 
-    pub fn remove(&mut self, path: &PathBuf) -> Option<IndexEntry> {
-        self.entries.remove(path)
+    fn insert_into_directories_map<P: AsRef<Path>>(&mut self, path: P) {
+        if let Some(directory) = path.as_ref().ancestors().skip(1).next() {
+            let subdirs = if let Some(subdirs) = self.directories.get_mut(directory) {
+                subdirs
+            } else {
+                let subdirs = HashSet::new();
+                self.directories.insert(PathBuf::from(directory), subdirs);
+                self.directories.get_mut(directory).unwrap()
+            };
+
+            let filename = String::from(path.as_ref().file_name().unwrap().to_str().unwrap());
+            subdirs.insert(filename);
+
+            self.insert_into_directories_map(directory)
+        }
+    }
+
+    /**
+     * We need to discard any new entries that conflict with existing ones. For example, given an
+     * existing entry `file.txt`, adding a new entry for `file.txt/nested.txt` (i.e. there's now a
+     * directory called `file.txt` with a file `nested.txt` in it), we need to remove `file.txt`.
+     *
+     * Similarly, given an existing entry `nested/dir/file.txt` and adding an entry `nested`, we
+     * expect `nested/dir/file.txt` to be removed from the index.
+     */
+    fn discard_conflicting_entries<P: AsRef<Path>>(&mut self, path: P) {
+        self.remove_directory(&path);
+        for parent in path.as_ref().ancestors() {
+            self.remove(parent);
+        }
+    }
+
+    pub fn remove<P: AsRef<Path>>(&mut self, path: P) -> Option<IndexEntry> {
+        if let Some(removed_entry) = self.entries.remove(path.as_ref()) {
+            self.remove_from_directories_map(path.as_ref());
+            Some(removed_entry)
+        } else {
+            None
+        }
+    }
+
+    fn remove_directory<P: AsRef<Path>>(&mut self, path: P) {
+        if let Some(child_names) = self.directories.remove(path.as_ref()) {
+            child_names
+                .iter()
+                .map(|child| path.as_ref().join(child))
+                .for_each(|path| {
+                    self.remove(&path);
+                    self.remove_directory(&path);
+                });
+        }
+    }
+
+    fn remove_from_directories_map(&mut self, path: &Path) {
+        if let Some(parent) = path.parent() {
+            if let Some(parent_children) = self.directories.get_mut(parent) {
+                let filename = path.file_name().unwrap().to_str().unwrap();
+                parent_children.remove(filename);
+
+                if parent_children.is_empty() {
+                    self.directories.remove(parent);
+                    self.remove_from_directories_map(parent);
+                }
+            }
+        }
     }
 
     pub fn get_entries(&self) -> Vec<&IndexEntry> {
@@ -195,7 +267,7 @@ pub struct IndexEntry {
 }
 
 impl IndexEntry {
-    pub fn new(path: PathBuf, object_id: Vec<u8>, metadata: &Metadata) -> IndexEntry {
+    pub fn new<P: AsRef<Path>>(path: P, object_id: Vec<u8>, metadata: &Metadata) -> IndexEntry {
         let ctime_seconds = metadata.st_ctime() as u32;
         let ctime_nanoseconds = metadata.st_ctime_nsec() as u32;
         let mtime_seconds = metadata.st_mtime() as u32;
@@ -218,7 +290,7 @@ impl IndexEntry {
             uid,
             gid,
             file_size,
-            path,
+            path: path.as_ref().to_owned(),
             object_id,
         }
     }
@@ -351,6 +423,56 @@ mod tests {
         let index_from_bytes = Index::from_bytes(&index_bytes).ok().unwrap();
 
         assert_eq!(index_from_bytes, index);
+    }
+
+    #[test]
+    fn test_add_file_in_directory_with_name_clashing_with_index_entry() {
+        let expected_index = {
+            let mut index = Index::new();
+            index.add_entry(create_entry("file.txt/nested.txt"));
+            index
+        };
+
+        let file_entry = create_entry("file.txt");
+        let file_in_directory_entry = create_entry("file.txt/nested.txt");
+
+        let mut index = Index::new();
+        index.add_entry(file_entry);
+        index.add_entry(file_in_directory_entry);
+
+        assert_eq!(index, expected_index);
+    }
+
+    #[test]
+    fn test_add_file_with_name_of_directory_causes_directory_and_descendants_to_be_removed() {
+        let expected_index = {
+            let mut index = Index::new();
+            index.add_entry(create_entry("nested"));
+            index
+        };
+
+        let file_in_directory_entry = create_entry("nested/file.txt");
+        let file_in_nested_directory_entry = create_entry("nested/again/other.txt");
+        let file_with_top_level_dir_name = create_entry("nested");
+
+        let mut index = Index::new();
+        index.add_entry(file_in_directory_entry);
+        index.add_entry(file_in_nested_directory_entry);
+        index.add_entry(file_with_top_level_dir_name);
+
+        assert_eq!(index, expected_index);
+    }
+
+    #[test]
+    fn test_remove_last_entry_in_directory_yields_empty_index() {
+        let mut index = Index::new();
+        let entry = create_entry("nested/file.txt");
+        let entry_path = PathBuf::from(&entry.path);
+        index.add_entry(entry);
+
+        index.remove(&entry_path);
+
+        assert_eq!(index, Index::new());
     }
 
     #[test]

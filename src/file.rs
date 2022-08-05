@@ -2,10 +2,10 @@ use std::{
     fs::{self, File, OpenOptions},
     io,
     io::{Read, Write},
-    path::PathBuf,
+    path::{Path, PathBuf},
 };
 
-pub fn read_file(path: &PathBuf) -> io::Result<Vec<u8>> {
+pub fn read_file<P: AsRef<Path>>(path: P) -> io::Result<Vec<u8>> {
     let mut file = File::open(path)?;
     let mut bytes: Vec<u8> = Vec::new();
     file.read_to_end(&mut bytes)?;
