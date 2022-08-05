@@ -1,6 +1,7 @@
 use std::fs;
 use std::io;
 use std::io::prelude::*;
+use std::path::Path;
 use std::path::PathBuf;
 
 use flate2::write::ZlibEncoder;
@@ -37,9 +38,11 @@ impl Workspace {
         config::read_config().unwrap()
     }
 
-    pub fn relativize_path(&self, absolute_path: &PathBuf) -> PathBuf {
-        let prefix = format!("{}/", self.workdir().as_os_str().to_str().unwrap());
-        let relative_path = absolute_path.strip_prefix(prefix).expect("Bad path");
+    pub fn relativize_path<P: AsRef<Path>>(&self, absolute_path: P) -> PathBuf {
+        let relative_path = absolute_path
+            .as_ref()
+            .strip_prefix(self.workdir())
+            .expect("Bad path");
         if relative_path.as_os_str() == "" {
             PathBuf::from(".")
         } else {
