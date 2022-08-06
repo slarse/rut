@@ -1,4 +1,7 @@
-use std::{fs, io, path::PathBuf};
+use std::{
+    fs, io,
+    path::{Path, PathBuf},
+};
 use walkdir::{DirEntry, WalkDir};
 
 use crate::{
@@ -10,8 +13,8 @@ use crate::{
 
 static GITIGNORE: [&str; 2] = ["Cargo.lock", "target"];
 
-pub fn add(path: PathBuf, workspace: &Workspace, database: &Database) -> io::Result<()> {
-    if GITIGNORE.contains(&path.to_str().expect("Path was bad UTF8")) {
+pub fn add<P: AsRef<Path>>(path: P, workspace: &Workspace, database: &Database) -> io::Result<()> {
+    if GITIGNORE.contains(&path.as_ref().to_str().expect("Path was bad UTF8")) {
         return Ok(());
     }
 
@@ -29,16 +32,16 @@ pub fn add(path: PathBuf, workspace: &Workspace, database: &Database) -> io::Res
 }
 
 fn add_file(
-    absolute_path: &PathBuf,
+    absolute_path: &Path,
     index: &mut Index,
     workspace: &Workspace,
     database: &Database,
 ) -> io::Result<()> {
-    let file_bytes = file::read_file(&absolute_path)?;
+    let file_bytes = file::read_file(absolute_path)?;
     let blob = Blob::new(file_bytes);
     database.store_object(&blob)?;
 
-    let metadata = fs::metadata(&absolute_path)?;
+    let metadata = fs::metadata(absolute_path)?;
 
     let relative_path = workspace.relativize_path(absolute_path);
     let entry = IndexEntry::new(relative_path, blob.id(), &metadata);
@@ -48,7 +51,7 @@ fn add_file(
     Ok(())
 }
 
-fn resolve_files(path: &PathBuf) -> Vec<PathBuf> {
+fn resolve_files(path: &Path) -> Vec<PathBuf> {
     if path.is_dir() {
         WalkDir::new(&path)
             .into_iter()
