@@ -49,14 +49,19 @@ pub struct LockFile<'a> {
 
 impl<'a> LockFile<'a> {
     pub fn acquire(path: &PathBuf) -> io::Result<LockFile> {
-        let lockfile_extension = format!("{:?}.{}", path.extension(), "lock");
+        let base_extension = String::from("lock");
+        let lockfile_extension = match path.extension() {
+            Some(ext) => format!("{:?}.{}", ext, base_extension),
+            None => base_extension,
+        };
         let mut lockfile_path = PathBuf::from(path);
         lockfile_path.set_extension(lockfile_extension);
 
-        let lockfile = OpenOptions::new()
+        let lockfile_result = OpenOptions::new()
             .create_new(true)
             .write(true)
-            .open(&lockfile_path)?;
+            .open(&lockfile_path);
+        let lockfile = LockFile::handle_lockfile_create_failure(lockfile_result, &lockfile_path)?;
 
         Ok(LockFile {
             path,
@@ -67,6 +72,17 @@ impl<'a> LockFile<'a> {
 
     pub fn write(&mut self, mut text: &[u8]) -> io::Result<()> {
         self.lockfile.write_all(&mut text)
+    }
+
+    fn handle_lockfile_create_failure(result: Result<File, io::Error>, lockfile_path: &PathBuf) -> std::io::Result<File> {
+        match result {
+            ok @ Ok(_) => ok,
+            Err(error) if error.kind() == io::ErrorKind::AlreadyExists => {
+                let message = format!("fatal: Unable to create '{}': File exists.", lockfile_path.to_str().unwrap());
+                Err(io::Error::new(io::ErrorKind::AlreadyExists, message))
+            },
+            err => err
+        }
     }
 }
 

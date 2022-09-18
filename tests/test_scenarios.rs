@@ -161,6 +161,40 @@ fn test_remove_file() -> io::Result<()> {
     Ok(())
 }
 
+#[test]
+fn test_adding_file_when_index_is_locked() -> io::Result<()> {
+    // arrange
+    let workdir = create_temporary_directory();
+    let readme = workdir.join("README.md");
+
+    fs::write(&readme, "A README")?;
+
+    let workspace = Workspace::new(workdir);
+    let index_lockfile = workspace.git_dir().join("index.lock");
+    init::init(&workspace.git_dir())?;
+    let database = Database::new(workspace.git_dir());
+    fs::write(&index_lockfile, ";")?;
+
+    // act
+    let add_result = add::add(readme, &workspace, &database);
+
+    // assert
+    assert!(add_result.is_err());
+    match add_result {
+        Ok(()) => panic!("should have failed to add due to index lock"),
+        Err(error) => {
+            let message = error.to_string();
+            let expected_message = format!(
+                "fatal: Unable to create '{}': File exists.",
+                index_lockfile.to_str().unwrap()
+            );
+            assert_eq!(message, expected_message);
+        }
+    }
+
+    Ok(())
+}
+
 fn commit(commit_message: &str, workspace: &Workspace, database: &Database) -> io::Result<String> {
     fs::write(&workspace.git_dir().join("COMMIT_EDITMSG"), commit_message)?;
     commit::commit(&workspace, &database)?;
