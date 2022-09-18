@@ -49,7 +49,7 @@ pub struct LockFile<'a> {
 
 impl<'a> LockFile<'a> {
     pub fn acquire(path: &PathBuf) -> io::Result<LockFile> {
-        let lockfile_extension = format!("{:?}.{}", path.extension(), "lockfile_path");
+        let lockfile_extension = format!("{:?}.{}", path.extension(), "lock");
         let mut lockfile_path = PathBuf::from(path);
         lockfile_path.set_extension(lockfile_extension);
 
