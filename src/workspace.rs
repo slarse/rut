@@ -85,3 +85,48 @@ impl Database {
         Ok(compressed_bytes)
     }
 }
+
+pub struct Repository {
+    pub database: Database,
+    pub workspace: Workspace,
+}
+
+impl Repository {
+
+    pub fn from_worktree_root<P: AsRef<Path>>(worktree_root: P) -> Repository {
+        let database = Database::new(worktree_root.as_ref().join(".git"));
+        let workspace = Workspace::new(worktree_root.as_ref().to_owned());
+        Repository {
+            database,
+            workspace,
+        }
+    }
+
+    pub fn worktree(&self) -> Worktree {
+        Worktree::new(self.workspace.workdir())
+    }
+
+    pub fn index_file(&self) -> PathBuf {
+        self.git_dir().join("index")
+    }
+
+    pub fn git_dir(&self) -> PathBuf {
+        self.worktree().root().join(".git")
+    }
+}
+
+pub struct Worktree {
+    root: PathBuf,
+}
+
+impl Worktree {
+    pub fn new<P: AsRef<Path>>(root: P) -> Worktree {
+        Worktree {
+            root: root.as_ref().to_owned(),
+        }
+    }
+
+    pub fn root(&self) -> &Path {
+        &self.root
+    }
+}

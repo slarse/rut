@@ -8,31 +8,31 @@ use crate::hex::to_hex_string;
 use crate::index::{FileMode, Index, IndexEntry};
 use crate::objects::{Author, Commit, GitObject, Tree, TreeEntry};
 use crate::refs::RefHandler;
-use crate::workspace::{Database, Workspace};
+use crate::workspace::Repository;
 
-pub fn commit(workspace: &Workspace, database: &Database) -> io::Result<()> {
-    let index_bytes = file::read_file(&workspace.git_dir().join("index"))?;
+pub fn commit(repository: &Repository) -> io::Result<()> {
+    let index_bytes = file::read_file(&repository.git_dir().join("index"))?;
 
     // TODO handle index parse error
     let index = Index::from_bytes(&index_bytes).expect("Could not parse index");
 
     let (root_tree, containing_trees) = build_tree(&index.get_entries()[..]);
     for tree in containing_trees.iter() {
-        database.store_object(tree)?;
+        repository.database.store_object(tree)?;
     }
-    database.store_object(&root_tree)?;
+    repository.database.store_object(&root_tree)?;
 
-    let config = workspace.get_config();
+    let config = repository.workspace.get_config();
     let author = Author {
         name: config.author_name,
         email: config.author_email,
     };
-    let commit_msg = fs::read_to_string(workspace.git_dir().join("COMMIT_EDITMSG"))
+    let commit_msg = fs::read_to_string(repository.git_dir().join("COMMIT_EDITMSG"))
         .expect("failed to read commit message");
 
-    let head_ref = parse_head(workspace.git_dir().join("HEAD")).expect("HEAD does not exist");
+    let head_ref = parse_head(repository.git_dir().join("HEAD")).expect("HEAD does not exist");
 
-    let ref_handler = RefHandler::new(&workspace);
+    let ref_handler = RefHandler::new(&repository.workspace);
     let parent_commit = ref_handler.deref(&head_ref).ok();
 
     let time = SystemTime::now()
@@ -48,7 +48,7 @@ pub fn commit(workspace: &Workspace, database: &Database) -> io::Result<()> {
         timestamp: time,
     };
 
-    database.store_object(&commit)?;
+    repository.database.store_object(&commit)?;
 
     let first_line = commit_msg
         .split("\n")
@@ -69,7 +69,7 @@ pub fn commit(workspace: &Workspace, database: &Database) -> io::Result<()> {
     );
 
     fs::write(
-        workspace.git_dir().join(head_ref),
+        repository.git_dir().join(head_ref),
         to_hex_string(&commit.id()),
     )?;
 

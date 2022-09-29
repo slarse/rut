@@ -5,45 +5,41 @@ use std::{
 use walkdir::{DirEntry, WalkDir};
 
 use crate::{
-    file::{self, LockFile},
+    file,
+    file::LockFile,
     index::{Index, IndexEntry},
     objects::{Blob, GitObject},
-    workspace::{Database, Workspace},
+    workspace::Repository,
 };
 
 static GITIGNORE: [&str; 2] = ["Cargo.lock", "target"];
 
-pub fn add<P: AsRef<Path>>(path: P, workspace: &Workspace, database: &Database) -> io::Result<()> {
+pub fn add<P: AsRef<Path>>(path: P, repository: &Repository) -> io::Result<()> {
     if GITIGNORE.contains(&path.as_ref().to_str().expect("Path was bad UTF8")) {
         return Ok(());
     }
 
-    let absolute_path = workspace.workdir().join(&path);
+    let absolute_path = repository.worktree().root().join(&path);
 
-    let index_file_path = workspace.git_dir().join("index");
+    let index_file_path = repository.index_file();
     let mut index_lockfile = LockFile::acquire(&index_file_path)?;
     let mut index = Index::from_file(&index_file_path)?;
 
     for path in resolve_files(&absolute_path) {
-        add_file(&path, &mut index, &workspace, &database)?;
+        add_file(&path, &mut index, &repository)?;
     }
 
-    index_lockfile.write(&index.as_vec())
+    index_lockfile.write(&mut index.as_vec())
 }
 
-fn add_file(
-    absolute_path: &Path,
-    index: &mut Index,
-    workspace: &Workspace,
-    database: &Database,
-) -> io::Result<()> {
+fn add_file(absolute_path: &Path, index: &mut Index, repository: &Repository) -> io::Result<()> {
     let file_bytes = file::read_file(absolute_path)?;
     let blob = Blob::new(file_bytes);
-    database.store_object(&blob)?;
+    repository.database.store_object(&blob)?;
 
     let metadata = fs::metadata(absolute_path)?;
 
-    let relative_path = workspace.relativize_path(absolute_path);
+    let relative_path = repository.workspace.relativize_path(absolute_path);
     let entry = IndexEntry::new(relative_path, blob.id(), &metadata);
 
     index.add_entry(entry);

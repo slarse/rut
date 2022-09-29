@@ -2,7 +2,7 @@ use std::io::Error;
 
 use crate::{
     add, commit, init, rm,
-    workspace::{Database, Workspace},
+    workspace::Repository,
 };
 use std::env;
 use std::io;
@@ -13,21 +13,20 @@ pub fn run_command(args: Vec<String>) -> io::Result<()> {
     let workdir = env::current_dir()?;
     let git_dir = workdir.join(".git");
 
-    let workspace = Workspace::new(workdir);
-    let database = Database::new(workspace.git_dir());
+    let repository = Repository::from_worktree_root(workdir);
 
     match sliced_args[..] {
         ["init"] => {
             init::init(&git_dir)?;
         }
         ["commit"] => {
-            commit::commit(&workspace, &database)?;
+            commit::commit(&repository)?;
         }
         ["add", path] => {
-            add::add(resolve_path(path)?, &workspace, &database)?;
+            add::add(resolve_path(path)?, &repository)?;
         }
         ["rm", path] => {
-            rm::rm(resolve_path(path)?, &workspace)?;
+            rm::rm(resolve_path(path)?, &repository)?;
         }
         _ => panic!("unexpected command {:?}", sliced_args),
     };

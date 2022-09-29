@@ -8,9 +8,9 @@ use std::{
     str,
 };
 
-use rut::{add, commit, index::Index, init, rm};
+use rut::{add, commit, index::Index, init, rm, workspace::Repository};
 
-use rut::workspace::{Database, Workspace};
+use rut::workspace::Workspace;
 
 #[test]
 fn test_creating_commit_with_nested_directory() -> io::Result<()> {
@@ -28,19 +28,18 @@ fn test_creating_commit_with_nested_directory() -> io::Result<()> {
     fs::write(&file_in_nested_dir, "A file.")?;
 
     // act
-    let workspace = Workspace::new(workdir);
-    init::init(&workspace.git_dir())?;
-    let database = Database::new(workspace.git_dir());
+    let repository = Repository::from_worktree_root(workdir);
+    init::init(&repository.git_dir())?;
 
-    rut_add(&readme, &workspace, &database);
-    rut_add(&file_in_nested_dir, &workspace, &database);
+    rut_add(&readme, &repository);
+    rut_add(&file_in_nested_dir, &repository);
 
-    commit("Initial commit", &workspace, &database)?;
+    commit("Initial commit", &repository)?;
 
     // assert
-    assert_healthy_repo(&workspace.git_dir());
-    assert_is_root_tree(&workspace, expected_root_tree_id);
-    assert_file_contains(&workspace.git_dir().join("HEAD"), "ref: refs/heads/main");
+    assert_healthy_repo(&repository.git_dir());
+    assert_is_root_tree(&repository.workspace, expected_root_tree_id);
+    assert_file_contains(&repository.git_dir().join("HEAD"), "ref: refs/heads/main");
 
     Ok(())
 }
@@ -53,26 +52,25 @@ fn test_second_commit_gets_proper_parent() -> io::Result<()> {
     fs::write(&readme, "First commit content")?;
 
     // act
-    let workspace = Workspace::new(workdir);
-    init::init(&workspace.git_dir())?;
-    let database = Database::new(workspace.git_dir());
+    let repository = Repository::from_worktree_root(workdir);
+    init::init(&repository.git_dir())?;
 
-    rut_add(&readme, &workspace, &database);
+    rut_add(&readme, &repository);
 
-    let first_commit_sha = commit("First commit", &workspace, &database)?;
+    let first_commit_sha = commit("First commit", &repository)?;
 
     fs::write(&readme, "Second commit content")?;
-    rut_add(&readme, &workspace, &database);
-    let second_commit_sha = commit("Second commit", &workspace, &database)?;
+    rut_add(&readme, &repository);
+    let second_commit_sha = commit("Second commit", &repository)?;
 
     assert_ne!(first_commit_sha, second_commit_sha);
 
     assert_file_contains(
-        &workspace.git_dir().join("refs/heads/main"),
+        &repository.git_dir().join("refs/heads/main"),
         &second_commit_sha,
     );
 
-    let second_commit_content = git_cat_file(&workspace.git_dir(), &second_commit_sha);
+    let second_commit_content = git_cat_file(&repository.git_dir(), &second_commit_sha);
     assert_eq!(second_commit_content.contains(&first_commit_sha), true);
 
     Ok(())
@@ -92,14 +90,13 @@ fn test_add_directory() -> io::Result<()> {
     fs::write(&file_in_nested_dir, "A file.")?;
 
     // act
-    let workspace = Workspace::new(workdir);
-    init::init(&workspace.git_dir())?;
-    let database = Database::new(workspace.git_dir());
+    let repository = Repository::from_worktree_root(&workdir);
+    init::init(&repository.git_dir())?;
 
-    rut_add(workspace.workdir(), &workspace, &database);
+    rut_add(&workdir, &repository);
 
     // assert
-    let index = Index::from_file(&workspace.git_dir().join("index"))?;
+    let index = Index::from_file(&repository.git_dir().join("index"))?;
     let paths_in_index: Vec<&PathBuf> = index
         .get_entries()
         .iter()
@@ -130,18 +127,17 @@ fn test_remove_file() -> io::Result<()> {
     fs::write(&readme, "A README.")?;
     fs::write(&file_txt, "A file.")?;
 
-    let workspace = Workspace::new(workdir);
-    init::init(&workspace.git_dir())?;
-    let database = Database::new(workspace.git_dir());
+    let repository = Repository::from_worktree_root(workdir);
+    init::init(&repository.workspace.git_dir())?;
 
-    rut_add(workspace.workdir(), &workspace, &database);
-    commit("Initial commit", &workspace, &database)?;
+    rut_add(repository.workspace.workdir(), &repository);
+    commit("Initial commit", &repository)?;
 
     // act
-    rut_rm(&readme, &workspace);
+    rut_rm(&readme, &repository);
 
     // assert
-    let index = Index::from_file(&workspace.git_dir().join("index"))?;
+    let index = Index::from_file(&repository.index_file())?;
     let paths_in_index: Vec<&PathBuf> = index
         .get_entries()
         .iter()
@@ -169,14 +165,13 @@ fn test_adding_file_when_index_is_locked() -> io::Result<()> {
 
     fs::write(&readme, "A README")?;
 
-    let workspace = Workspace::new(workdir);
-    let index_lockfile = workspace.git_dir().join("index.lock");
-    init::init(&workspace.git_dir())?;
-    let database = Database::new(workspace.git_dir());
+    let repository = Repository::from_worktree_root(workdir);
+    init::init(&repository.git_dir())?;
+    let index_lockfile = repository.git_dir().join("index.lock");
     fs::write(&index_lockfile, ";")?;
 
     // act
-    let add_result = add::add(readme, &workspace, &database);
+    let add_result = add::add(readme, &repository);
 
     // assert
     assert!(add_result.is_err());
@@ -195,18 +190,18 @@ fn test_adding_file_when_index_is_locked() -> io::Result<()> {
     Ok(())
 }
 
-fn commit(commit_message: &str, workspace: &Workspace, database: &Database) -> io::Result<String> {
-    fs::write(&workspace.git_dir().join("COMMIT_EDITMSG"), commit_message)?;
-    commit::commit(&workspace, &database)?;
-    Ok(get_head_commit(&workspace.git_dir()))
+fn commit(commit_message: &str, repository: &Repository) -> io::Result<String> {
+    fs::write(&repository.git_dir().join("COMMIT_EDITMSG"), commit_message)?;
+    commit::commit(&repository)?;
+    Ok(get_head_commit(&repository.git_dir()))
 }
 
-fn rut_add(path: &PathBuf, workspace: &Workspace, database: &Database) {
-    add::add(path.to_owned(), &workspace, &database).expect("Failed to add file");
+fn rut_add(path: &PathBuf, repository: &Repository) {
+    add::add(path.to_owned(), repository).expect("Failed to add file");
 }
 
-fn rut_rm(path: &PathBuf, workspace: &Workspace) {
-    rm::rm(path, workspace).expect("Failed to remove file");
+fn rut_rm(path: &PathBuf, repository: &Repository) {
+    rm::rm(path, repository).expect("Failed to remove file");
 }
 
 fn get_head_commit(git_dir: &PathBuf) -> String {
