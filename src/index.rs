@@ -8,6 +8,7 @@ use std::path::PathBuf;
 use std::str;
 
 use crate::file;
+use crate::file::AsVec;
 use crate::hashing;
 use crate::hex;
 
@@ -227,8 +228,10 @@ impl Index {
         entries.sort_by(|lhs, rhs| lhs.path.cmp(&rhs.path));
         entries
     }
+}
 
-    pub fn as_vec(&self) -> Vec<u8> {
+impl AsVec<u8> for Index {
+    fn as_vec(&self) -> Vec<u8> {
         let signature = SIGNATURE.as_bytes();
         let num_entries = (self.entries.len() as u32).to_be_bytes();
 

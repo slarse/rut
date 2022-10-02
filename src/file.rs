@@ -41,13 +41,13 @@ pub fn atomic_write(path: &PathBuf, mut content: &[u8]) -> io::Result<()> {
  * which the lock was acquired. Renames are atomic operations, so there is no risk that someone
  * reading the file without acquiring the lock gets a partially written result.
  */
-pub struct LockFile<'a> {
-    path: &'a PathBuf,
+pub struct LockFile {
+    path: PathBuf,
     lockfile: File,
     lockfile_path: PathBuf,
 }
 
-impl<'a> LockFile<'a> {
+impl LockFile {
     pub fn acquire(path: &PathBuf) -> io::Result<LockFile> {
         let base_extension = String::from("lock");
         let lockfile_extension = match path.extension() {
@@ -64,7 +64,7 @@ impl<'a> LockFile<'a> {
         let lockfile = LockFile::handle_lockfile_create_failure(lockfile_result, &lockfile_path)?;
 
         Ok(LockFile {
-            path,
+            path: path.to_owned(),
             lockfile,
             lockfile_path,
         })
@@ -74,22 +74,28 @@ impl<'a> LockFile<'a> {
         self.lockfile.write_all(&mut text)
     }
 
-    fn handle_lockfile_create_failure(result: Result<File, io::Error>, lockfile_path: &PathBuf) -> std::io::Result<File> {
+    fn handle_lockfile_create_failure(
+        result: Result<File, io::Error>,
+        lockfile_path: &PathBuf,
+    ) -> std::io::Result<File> {
         match result {
             ok @ Ok(_) => ok,
             Err(error) if error.kind() == io::ErrorKind::AlreadyExists => {
-                let message = format!("fatal: Unable to create '{}': File exists.", lockfile_path.to_str().unwrap());
+                let message = format!(
+                    "fatal: Unable to create '{}': File exists.",
+                    lockfile_path.to_str().unwrap()
+                );
                 Err(io::Error::new(io::ErrorKind::AlreadyExists, message))
-            },
-            err => err
+            }
+            err => err,
         }
     }
 }
 
-impl<'a> Drop for LockFile<'a> {
+impl Drop for LockFile {
     fn drop(&mut self) {
         let error_message = format!("Failed to commit changes for {:?}", self.lockfile);
-        fs::rename(&self.lockfile_path, self.path).expect(&error_message);
+        fs::rename(&self.lockfile_path, &self.path).expect(&error_message);
     }
 }
 
@@ -164,5 +170,40 @@ mod tests {
                 .expect("Failed to decode process output")
                 .trim_end_matches("\n"),
         )
+    }
+}
+
+pub trait AsVec<T> {
+    fn as_vec(&self) -> Vec<T>;
+}
+
+/**
+ * A resource backed by a lockfile. The final write is atomically transferred to the original file
+ * when this struct is destroyed.
+ *
+ * Do note that any intermediate writes are simply discarded.
+ */
+pub struct LockFileResource<T: AsVec<u8>> {
+    lockfile: LockFile,
+    resource: T,
+}
+
+impl<T: AsVec<u8>> LockFileResource<T> {
+    pub fn new(lockfile: LockFile, resource: T) -> LockFileResource<T> {
+        LockFileResource { lockfile, resource }
+    }
+
+    /**
+     * Write the resource to the lockfile. The final write to the lockfile are committed to the
+     * original resource once this struct is destroyed.
+     */
+    pub fn write(&mut self) -> io::Result<()> {
+        self.lockfile.write(&mut self.resource.as_vec())
+    }
+}
+
+impl<'a, T: AsVec<u8>> AsMut<T> for LockFileResource<T> {
+    fn as_mut(&mut self) -> &mut T {
+        &mut self.resource
     }
 }

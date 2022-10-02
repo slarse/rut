@@ -6,7 +6,6 @@ use walkdir::{DirEntry, WalkDir};
 
 use crate::{
     file,
-    file::LockFile,
     index::{Index, IndexEntry},
     objects::{Blob, GitObject},
     workspace::Repository,
@@ -20,16 +19,13 @@ pub fn add<P: AsRef<Path>>(path: P, repository: &Repository) -> io::Result<()> {
     }
 
     let absolute_path = repository.worktree().root().join(&path);
-
-    let index_file_path = repository.index_file();
-    let mut index_lockfile = LockFile::acquire(&index_file_path)?;
-    let mut index = Index::from_file(&index_file_path)?;
+    let mut index = repository.load_index()?;
 
     for path in resolve_files(&absolute_path) {
-        add_file(&path, &mut index, &repository)?;
+        add_file(&path, index.as_mut(), &repository)?;
     }
 
-    index_lockfile.write(&mut index.as_vec())
+    index.write()
 }
 
 fn add_file(absolute_path: &Path, index: &mut Index, repository: &Repository) -> io::Result<()> {

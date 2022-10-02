@@ -10,7 +10,9 @@ use flate2::Compression;
 use crate::config;
 use crate::config::Config;
 use crate::file;
+use crate::file::{LockFileResource, LockFile};
 use crate::hex;
+use crate::index::Index;
 use crate::objects::GitObject;
 
 pub struct Workspace {
@@ -108,6 +110,13 @@ impl Repository {
 
     pub fn index_file(&self) -> PathBuf {
         self.git_dir().join("index")
+    }
+
+    pub fn load_index(&self) -> io::Result<LockFileResource<Index>> {
+        let index_file_path = self.git_dir().join("index");
+        let lockfile = LockFile::acquire(&index_file_path)?;
+        let index = Index::from_file(&index_file_path)?;
+        Ok(LockFileResource::new(lockfile, index))
     }
 
     pub fn git_dir(&self) -> PathBuf {
