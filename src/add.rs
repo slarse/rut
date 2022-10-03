@@ -35,7 +35,7 @@ fn add_file(absolute_path: &Path, index: &mut Index, repository: &Repository) ->
 
     let metadata = fs::metadata(absolute_path)?;
 
-    let relative_path = repository.workspace.relativize_path(absolute_path);
+    let relative_path = repository.worktree().relativize_path(absolute_path);
     let entry = IndexEntry::new(relative_path, blob.id(), &metadata);
 
     index.add_entry(entry);

@@ -3,17 +3,17 @@ use std::io;
 use std::io::Error;
 use std::str;
 
-use crate::workspace::Workspace;
+use crate::workspace::Repository;
 
 pub struct RefHandler<'a> {
-    workspace: &'a Workspace,
+    repository: &'a Repository,
 }
 
 const SHA1_SIZE: usize = 40;
 
 impl<'a> RefHandler<'a> {
-    pub fn new(workspace: &Workspace) -> RefHandler {
-        RefHandler { workspace }
+    pub fn new(repository: &Repository) -> RefHandler {
+        RefHandler { repository }
     }
 
     /**
@@ -22,7 +22,7 @@ impl<'a> RefHandler<'a> {
     pub fn deref(&self, reference: &str) -> io::Result<String> {
         let trimmed_reference = reference.trim().trim_start_matches("refs/heads/");
         let ref_file = self
-            .workspace
+            .repository
             .git_dir()
             .join("refs/heads/")
             .join(trimmed_reference);

@@ -10,48 +10,10 @@ use flate2::Compression;
 use crate::config;
 use crate::config::Config;
 use crate::file;
-use crate::file::{LockFileResource, LockFile};
+use crate::file::{LockFile, LockFileResource};
 use crate::hex;
 use crate::index::Index;
 use crate::objects::GitObject;
-
-pub struct Workspace {
-    workdir: PathBuf,
-}
-
-impl Workspace {
-    pub fn new(workdir: PathBuf) -> Workspace {
-        Workspace { workdir }
-    }
-
-    pub fn workdir(&self) -> &PathBuf {
-        &self.workdir
-    }
-
-    pub fn git_dir(&self) -> PathBuf {
-        self.workdir.join(".git")
-    }
-
-    pub fn objects_dir(&self) -> PathBuf {
-        self.git_dir().join("objects")
-    }
-
-    pub fn get_config(&self) -> Config {
-        config::read_config().unwrap()
-    }
-
-    pub fn relativize_path<P: AsRef<Path>>(&self, absolute_path: P) -> PathBuf {
-        let relative_path = absolute_path
-            .as_ref()
-            .strip_prefix(self.workdir())
-            .expect("Bad path");
-        if relative_path.as_os_str() == "" {
-            PathBuf::from(".")
-        } else {
-            PathBuf::from(relative_path)
-        }
-    }
-}
 
 pub struct Database {
     git_dir: PathBuf,
@@ -90,22 +52,18 @@ impl Database {
 
 pub struct Repository {
     pub database: Database,
-    pub workspace: Workspace,
+    worktree: Worktree,
 }
 
 impl Repository {
-
     pub fn from_worktree_root<P: AsRef<Path>>(worktree_root: P) -> Repository {
         let database = Database::new(worktree_root.as_ref().join(".git"));
-        let workspace = Workspace::new(worktree_root.as_ref().to_owned());
-        Repository {
-            database,
-            workspace,
-        }
+        let worktree = Worktree::new(worktree_root.as_ref().to_owned());
+        Repository { database, worktree }
     }
 
-    pub fn worktree(&self) -> Worktree {
-        Worktree::new(self.workspace.workdir())
+    pub fn worktree(&self) -> &Worktree {
+        &self.worktree
     }
 
     pub fn index_file(&self) -> PathBuf {
@@ -120,7 +78,15 @@ impl Repository {
     }
 
     pub fn git_dir(&self) -> PathBuf {
-        self.worktree().root().join(".git")
+        self.worktree.root().join(".git")
+    }
+
+    pub fn objects_dir(&self) -> PathBuf {
+        self.git_dir().join("objects")
+    }
+
+    pub fn config(&self) -> Config {
+        config::read_config().unwrap()
     }
 }
 
@@ -135,7 +101,25 @@ impl Worktree {
         }
     }
 
+    /**
+     * Absolute path to the root of the worktree.
+     */
     pub fn root(&self) -> &Path {
         &self.root
+    }
+
+    /**
+     * Return the path relative to the root of this worktree.
+     */
+    pub fn relativize_path<P: AsRef<Path>>(&self, absolute_path: P) -> PathBuf {
+        let relative_path = absolute_path
+            .as_ref()
+            .strip_prefix(&self.root)
+            .expect("Bad path");
+        if relative_path.as_os_str() == "" {
+            PathBuf::from(".")
+        } else {
+            PathBuf::from(relative_path)
+        }
     }
 }

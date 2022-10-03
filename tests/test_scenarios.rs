@@ -4,13 +4,12 @@ use std::{
     io,
     io::Read,
     path::PathBuf,
+    path::Path,
     process::{Command, Output},
     str,
 };
 
 use rut::{add, commit, index::Index, init, rm, workspace::Repository};
-
-use rut::workspace::Workspace;
 
 #[test]
 fn test_creating_commit_with_nested_directory() -> io::Result<()> {
@@ -38,7 +37,7 @@ fn test_creating_commit_with_nested_directory() -> io::Result<()> {
 
     // assert
     assert_healthy_repo(&repository.git_dir());
-    assert_is_root_tree(&repository.workspace, expected_root_tree_id);
+    assert_is_root_tree(&repository, expected_root_tree_id);
     assert_file_contains(&repository.git_dir().join("HEAD"), "ref: refs/heads/main");
 
     Ok(())
@@ -128,9 +127,9 @@ fn test_remove_file() -> io::Result<()> {
     fs::write(&file_txt, "A file.")?;
 
     let repository = Repository::from_worktree_root(workdir);
-    init::init(&repository.workspace.git_dir())?;
+    init::init(&repository.git_dir())?;
 
-    rut_add(repository.workspace.workdir(), &repository);
+    rut_add(repository.worktree().root(), &repository);
     commit("Initial commit", &repository)?;
 
     // act
@@ -196,7 +195,7 @@ fn commit(commit_message: &str, repository: &Repository) -> io::Result<String> {
     Ok(get_head_commit(&repository.git_dir()))
 }
 
-fn rut_add(path: &PathBuf, repository: &Repository) {
+fn rut_add(path: &Path, repository: &Repository) {
     add::add(path.to_owned(), repository).expect("Failed to add file");
 }
 
@@ -232,15 +231,15 @@ fn assert_healthy_repo(git_dir: &PathBuf) {
     assert_eq!(output.status.code().unwrap(), 0);
 }
 
-fn assert_is_root_tree(workspace: &Workspace, root_tree_id: &str) {
-    let root_tree_file = workspace
+fn assert_is_root_tree(repository: &Repository, root_tree_id: &str) {
+    let root_tree_file = repository
         .objects_dir()
         .join(&root_tree_id[0..2])
         .join(&root_tree_id[2..]);
 
     assert_eq!(root_tree_file.is_file(), true);
 
-    let git_dir = workspace.git_dir();
+    let git_dir = repository.git_dir();
     let stdout = git_cat_file(&git_dir, "HEAD");
     assert_eq!(stdout.contains(root_tree_id), true);
 }

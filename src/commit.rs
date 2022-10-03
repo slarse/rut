@@ -22,7 +22,7 @@ pub fn commit(repository: &Repository) -> io::Result<()> {
     }
     repository.database.store_object(&root_tree)?;
 
-    let config = repository.workspace.get_config();
+    let config = repository.config();
     let author = Author {
         name: config.author_name,
         email: config.author_email,
@@ -32,7 +32,7 @@ pub fn commit(repository: &Repository) -> io::Result<()> {
 
     let head_ref = parse_head(repository.git_dir().join("HEAD")).expect("HEAD does not exist");
 
-    let ref_handler = RefHandler::new(&repository.workspace);
+    let ref_handler = RefHandler::new(&repository);
     let parent_commit = ref_handler.deref(&head_ref).ok();
 
     let time = SystemTime::now()
