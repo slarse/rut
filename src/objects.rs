@@ -135,8 +135,8 @@ impl Display for Author {
 
 pub struct Commit<'a> {
     pub tree: &'a Tree,
-    pub author: &'a Author,
-    pub message: &'a str,
+    pub author: Author,
+    pub message: String,
     pub parent: Option<&'a str>,
     pub timestamp: u64,
 }

@@ -3,63 +3,78 @@ use std::path::Component;
 use std::time::{SystemTime, UNIX_EPOCH};
 use std::{fs, io, path::PathBuf};
 
-use crate::file;
 use crate::hex::to_hex_string;
-use crate::index::{FileMode, Index, IndexEntry};
+use crate::index::{FileMode, IndexEntry};
 use crate::objects::{Author, Commit, GitObject, Tree, TreeEntry};
 use crate::refs::RefHandler;
 use crate::workspace::Repository;
 
 pub fn commit(repository: &Repository) -> io::Result<()> {
-    let index_bytes = file::read_file(&repository.git_dir().join("index"))?;
+    let mut index = repository.load_index()?;
 
-    // TODO handle index parse error
-    let index = Index::from_bytes(&index_bytes).expect("Could not parse index");
-
-    let (root_tree, containing_trees) = build_tree(&index.get_entries()[..]);
+    let (root_tree, containing_trees) = build_tree(&index.as_mut().get_entries()[..]);
     for tree in containing_trees.iter() {
         repository.database.store_object(tree)?;
     }
     repository.database.store_object(&root_tree)?;
 
+    let head_ref = parse_head(repository.git_dir().join("HEAD")).expect("HEAD does not exist");
+    let ref_handler = RefHandler::new(&repository);
+    let parent_commit = ref_handler.deref(&head_ref).ok();
+    let commit = create_commit(&root_tree, parent_commit.as_deref(), &repository);
+    repository.database.store_object(&commit)?;
+
+    fs::write(
+        repository.git_dir().join(head_ref),
+        to_hex_string(&commit.id()),
+    )?;
+
+    print_commit_status(&commit);
+
+    Ok(())
+}
+
+fn create_commit<'a>(
+    tree: &'a Tree,
+    parent: Option<&'a str>,
+    repository: &'a Repository,
+) -> Commit<'a> {
     let config = repository.config();
     let author = Author {
         name: config.author_name,
         email: config.author_email,
     };
-    let commit_msg = fs::read_to_string(repository.git_dir().join("COMMIT_EDITMSG"))
+    let message = fs::read_to_string(repository.git_dir().join("COMMIT_EDITMSG"))
         .expect("failed to read commit message");
 
-    let head_ref = parse_head(repository.git_dir().join("HEAD")).expect("HEAD does not exist");
-
-    let ref_handler = RefHandler::new(&repository);
-    let parent_commit = ref_handler.deref(&head_ref).ok();
-
-    let time = SystemTime::now()
+    let timestamp = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap()
         .as_secs();
 
-    let commit = Commit {
-        tree: &root_tree,
-        author: &author,
-        message: &commit_msg,
-        parent: parent_commit.as_deref(),
-        timestamp: time,
-    };
+    Commit {
+        tree,
+        author,
+        message,
+        parent,
+        timestamp,
+    }
+}
 
-    repository.database.store_object(&commit)?;
+fn parse_head(head: PathBuf) -> io::Result<String> {
+    let head_content = fs::read_to_string(&head)?;
+    let trimmed_head_content = head_content.trim();
+    Ok(trimmed_head_content.trim_start_matches("ref: ").to_owned())
+}
 
-    let first_line = commit_msg
+fn print_commit_status(commit: &Commit) {
+    let first_line = commit
+        .message
         .split("\n")
         .next()
         .expect("Not a single line in the commit message");
 
-    let root_commit_notice = if parent_commit.is_some() {
-        ""
-    } else {
-        "(root commit) "
-    };
+    let root_commit_notice = commit.parent.map_or("", |_| "(root commit) ");
 
     println!(
         "[{}{}] {}",
@@ -67,19 +82,6 @@ pub fn commit(repository: &Repository) -> io::Result<()> {
         to_hex_string(&commit.short_id()),
         first_line
     );
-
-    fs::write(
-        repository.git_dir().join(head_ref),
-        to_hex_string(&commit.id()),
-    )?;
-
-    Ok(())
-}
-
-fn parse_head(head: PathBuf) -> io::Result<String> {
-    let head_content = fs::read_to_string(&head)?;
-    let trimmed_head_content = head_content.trim();
-    Ok(trimmed_head_content.trim_start_matches("ref: ").to_owned())
 }
 
 fn build_tree(entries: &[&IndexEntry]) -> (Tree, Vec<Tree>) {

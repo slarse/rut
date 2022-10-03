@@ -63,11 +63,22 @@ impl LockFile {
             .open(&lockfile_path);
         let lockfile = LockFile::handle_lockfile_create_failure(lockfile_result, &lockfile_path)?;
 
+        LockFile::copy(&path, &lockfile_path)?;
+
         Ok(LockFile {
             path: path.to_owned(),
             lockfile,
             lockfile_path,
         })
+    }
+
+    fn copy(from: &Path, to: &Path) -> io::Result<()> {
+        let content = if from.is_file() {
+            fs::read(from)?
+        } else {
+            vec![]
+        };
+        fs::write(to, content)
     }
 
     pub fn write(&mut self, mut text: &[u8]) -> io::Result<()> {
