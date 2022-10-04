@@ -9,7 +9,7 @@ use std::{
     str,
 };
 
-use rut::{add, commit, index::Index, init, rm, workspace::Repository};
+use rut::{add, commit, index::Index, init, output::OutputWriter, rm, workspace::Repository};
 
 #[test]
 fn test_creating_commit_with_nested_directory() -> io::Result<()> {
@@ -28,7 +28,7 @@ fn test_creating_commit_with_nested_directory() -> io::Result<()> {
 
     // act
     let repository = Repository::from_worktree_root(workdir);
-    init::init(&repository.git_dir())?;
+    rut_init(&repository);
 
     rut_add(&readme, &repository);
     rut_add(&file_in_nested_dir, &repository);
@@ -52,7 +52,7 @@ fn test_second_commit_gets_proper_parent() -> io::Result<()> {
 
     // act
     let repository = Repository::from_worktree_root(workdir);
-    init::init(&repository.git_dir())?;
+    rut_init(&repository);
 
     rut_add(&readme, &repository);
 
@@ -90,7 +90,7 @@ fn test_add_directory() -> io::Result<()> {
 
     // act
     let repository = Repository::from_worktree_root(&workdir);
-    init::init(&repository.git_dir())?;
+    rut_init(&repository);
 
     rut_add(&workdir, &repository);
 
@@ -127,7 +127,7 @@ fn test_remove_file() -> io::Result<()> {
     fs::write(&file_txt, "A file.")?;
 
     let repository = Repository::from_worktree_root(workdir);
-    init::init(&repository.git_dir())?;
+    rut_init(&repository);
 
     rut_add(repository.worktree().root(), &repository);
     commit("Initial commit", &repository)?;
@@ -166,7 +166,7 @@ fn test_adding_file_when_index_is_locked() -> io::Result<()> {
     fs::write(&readme, "A README")?;
 
     let repository = Repository::from_worktree_root(workdir);
-    init::init(&repository.git_dir())?;
+    rut_init(&repository);
     let index_lockfile = repository.git_dir().join("index.lock");
     fs::write(&index_lockfile, ";")?;
 
@@ -192,8 +192,16 @@ fn test_adding_file_when_index_is_locked() -> io::Result<()> {
 
 fn commit(commit_message: &str, repository: &Repository) -> io::Result<String> {
     fs::write(&repository.git_dir().join("COMMIT_EDITMSG"), commit_message)?;
-    commit::commit(&repository)?;
+    commit::commit(&repository, NoopOutputWriter)?;
     Ok(get_head_commit(&repository.git_dir()))
+}
+
+struct NoopOutputWriter;
+
+impl OutputWriter for NoopOutputWriter {
+    fn write(&mut self, _: String) -> io::Result<()> {
+        Ok(())
+    }
 }
 
 fn rut_add(path: &Path, repository: &Repository) {
@@ -202,6 +210,10 @@ fn rut_add(path: &Path, repository: &Repository) {
 
 fn rut_rm(path: &PathBuf, repository: &Repository) {
     rm::rm(path, repository).expect("Failed to remove file");
+}
+
+fn rut_init(repository: &Repository) {
+    init::init(repository.git_dir(), NoopOutputWriter {}).expect("Failed to initialize repo");
 }
 
 fn get_head_commit(git_dir: &PathBuf) -> String {

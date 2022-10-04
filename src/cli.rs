@@ -1,5 +1,6 @@
 use std::io::Error;
 
+use crate::output::OutputWriter;
 use crate::{add, commit, init, rm, workspace::Repository};
 use std::env;
 use std::io;
@@ -11,13 +12,14 @@ pub fn run_command(args: Vec<String>) -> io::Result<()> {
     let git_dir = workdir.join(".git");
 
     let repository = Repository::from_worktree_root(workdir);
+    let writer = StdoutWriter {};
 
     match sliced_args[..] {
         ["init"] => {
-            init::init(&git_dir)?;
+            init::init(&git_dir, writer)?;
         }
         ["commit"] => {
-            commit::commit(&repository)?;
+            commit::commit(&repository, writer)?;
         }
         ["add", path] => {
             add::add(resolve_path(path)?, &repository)?;
@@ -29,6 +31,14 @@ pub fn run_command(args: Vec<String>) -> io::Result<()> {
     };
 
     Ok(())
+}
+
+pub struct StdoutWriter;
+
+impl OutputWriter for StdoutWriter {
+    fn write(&mut self, content: String) -> io::Result<()> {
+        Ok(println!("{}", content))
+    }
 }
 
 fn resolve_path(path: &str) -> io::Result<PathBuf> {

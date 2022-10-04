@@ -6,10 +6,11 @@ use std::{fs, io, path::PathBuf};
 use crate::hex::to_hex_string;
 use crate::index::{FileMode, IndexEntry};
 use crate::objects::{Author, Commit, GitObject, Tree, TreeEntry};
+use crate::output::OutputWriter;
 use crate::refs::RefHandler;
 use crate::workspace::Repository;
 
-pub fn commit(repository: &Repository) -> io::Result<()> {
+pub fn commit(repository: &Repository, writer: impl OutputWriter) -> io::Result<()> {
     let mut index = repository.load_index()?;
 
     let (root_tree, containing_trees) = build_tree(&index.as_mut().get_entries()[..]);
@@ -29,7 +30,7 @@ pub fn commit(repository: &Repository) -> io::Result<()> {
         to_hex_string(&commit.id()),
     )?;
 
-    print_commit_status(&commit);
+    write_commit_status(&commit, writer)?;
 
     Ok(())
 }
@@ -67,7 +68,7 @@ fn parse_head(head: PathBuf) -> io::Result<String> {
     Ok(trimmed_head_content.trim_start_matches("ref: ").to_owned())
 }
 
-fn print_commit_status(commit: &Commit) {
+fn write_commit_status(commit: &Commit, mut writer: impl OutputWriter) -> io::Result<()> {
     let first_line = commit
         .message
         .split("\n")
@@ -76,12 +77,13 @@ fn print_commit_status(commit: &Commit) {
 
     let root_commit_notice = commit.parent.map_or("", |_| "(root commit) ");
 
-    println!(
+    let message = format!(
         "[{}{}] {}",
         root_commit_notice,
         to_hex_string(&commit.short_id()),
-        first_line
+        first_line,
     );
+    writer.write(message)
 }
 
 fn build_tree(entries: &[&IndexEntry]) -> (Tree, Vec<Tree>) {
