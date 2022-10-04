@@ -45,6 +45,7 @@ pub struct LockFile {
     path: PathBuf,
     lockfile: File,
     lockfile_path: PathBuf,
+    has_write: bool,
 }
 
 impl LockFile {
@@ -63,25 +64,16 @@ impl LockFile {
             .open(&lockfile_path);
         let lockfile = LockFile::handle_lockfile_create_failure(lockfile_result, &lockfile_path)?;
 
-        LockFile::copy(&path, &lockfile_path)?;
-
         Ok(LockFile {
             path: path.to_owned(),
             lockfile,
             lockfile_path,
+            has_write: false,
         })
     }
 
-    fn copy(from: &Path, to: &Path) -> io::Result<()> {
-        let content = if from.is_file() {
-            fs::read(from)?
-        } else {
-            vec![]
-        };
-        fs::write(to, content)
-    }
-
     pub fn write(&mut self, mut text: &[u8]) -> io::Result<()> {
+        self.has_write = true;
         self.lockfile.write_all(&mut text)
     }
 
@@ -106,7 +98,11 @@ impl LockFile {
 impl Drop for LockFile {
     fn drop(&mut self) {
         let error_message = format!("Failed to commit changes for {:?}", self.lockfile);
-        fs::rename(&self.lockfile_path, &self.path).expect(&error_message);
+        if self.has_write {
+            fs::rename(&self.lockfile_path, &self.path).expect(&error_message);
+        } else {
+            fs::remove_file(&self.lockfile_path).expect(&error_message);
+        }
     }
 }
 

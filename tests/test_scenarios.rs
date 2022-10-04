@@ -136,6 +136,7 @@ fn test_remove_file() -> io::Result<()> {
     rut_rm(&readme, &repository);
 
     // assert
+    assert_healthy_repo(&repository.git_dir());
     let index = Index::from_file(&repository.index_file())?;
     let paths_in_index: Vec<&PathBuf> = index
         .get_entries()
@@ -225,9 +226,9 @@ fn git_cat_file(git_dir: &PathBuf, reference: &str) -> String {
 fn assert_healthy_repo(git_dir: &PathBuf) {
     let git_dir_arg = git_dir.as_os_str().to_str().unwrap();
     let output = Command::new("git")
-        .args(["--git-dir", git_dir_arg, "show", "HEAD"])
+        .args(["--git-dir", git_dir_arg, "status"])
         .output()
-        .expect("Failed running 'git show HEAD'");
+        .expect("Failed running 'git status'");
     assert_eq!(output.status.code().unwrap(), 0);
 }
 
