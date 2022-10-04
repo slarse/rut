@@ -1,9 +1,6 @@
 use std::io::Error;
 
-use crate::{
-    add, commit, init, rm,
-    workspace::Repository,
-};
+use crate::{add, commit, init, rm, workspace::Repository};
 use std::env;
 use std::io;
 use std::path::PathBuf;
@@ -41,5 +38,5 @@ fn resolve_path(path: &str) -> io::Result<PathBuf> {
     } else {
         let message = format!("pathspec {:?} did not match any files", resolved);
         Err(Error::new(io::ErrorKind::Other, message))
-    }
+    };
 }

@@ -3,8 +3,8 @@ use std::{
     fs::File,
     io,
     io::Read,
-    path::PathBuf,
     path::Path,
+    path::PathBuf,
     process::{Command, Output},
     str,
 };
