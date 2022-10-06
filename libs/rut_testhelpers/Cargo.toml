@@ -1,17 +1,8 @@
 [package]
-name = "rut"
+name = "rut_testhelpers"
 version = "0.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
-sha1 = "0.10"
-flate2 = "1.0"
-walkdir = "2"
-
-[dev-dependencies]
-rut_testhelpers = { path = "libs/rut_testhelpers" }
-
-[[bin]]
-name = "rut"
+rut = { path = "../../" }

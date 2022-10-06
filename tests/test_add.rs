@@ -1,0 +1,78 @@
+use std::{fs, io, path::PathBuf};
+
+use rut::{add, index::Index, workspace::Repository};
+
+use rut_testhelpers::{create_temporary_directory, rut_add, rut_init};
+
+#[test]
+fn test_add_directory() -> io::Result<()> {
+    // arrange
+    let workdir = create_temporary_directory();
+
+    let readme = workdir.join("README.md");
+    let nested_dir = workdir.join("nested");
+    let file_in_nested_dir = nested_dir.join("file.txt");
+
+    fs::create_dir(&nested_dir)?;
+    fs::write(&readme, "A README.")?;
+    fs::write(&file_in_nested_dir, "A file.")?;
+
+    // act
+    let repository = Repository::from_worktree_root(&workdir);
+    rut_init(&repository);
+
+    rut_add(&workdir, &repository);
+
+    // assert
+    let index = Index::from_file(&repository.git_dir().join("index"))?;
+    let paths_in_index: Vec<&PathBuf> = index
+        .get_entries()
+        .iter()
+        .map(|entry| &entry.path)
+        .collect();
+
+    let expected_paths: Vec<PathBuf> = ["README.md", "nested/file.txt"]
+        .iter()
+        .map(|path| PathBuf::from(path))
+        .collect();
+
+    assert_eq!(
+        paths_in_index,
+        expected_paths.iter().collect::<Vec<&PathBuf>>()
+    );
+
+    Ok(())
+}
+
+#[test]
+fn test_adding_file_when_index_is_locked() -> io::Result<()> {
+    // arrange
+    let workdir = create_temporary_directory();
+    let readme = workdir.join("README.md");
+
+    fs::write(&readme, "A README")?;
+
+    let repository = Repository::from_worktree_root(workdir);
+    rut_init(&repository);
+    let index_lockfile = repository.git_dir().join("index.lock");
+    fs::write(&index_lockfile, ";")?;
+
+    // act
+    let add_result = add::add(readme, &repository);
+
+    // assert
+    assert!(add_result.is_err());
+    match add_result {
+        Ok(()) => panic!("should have failed to add due to index lock"),
+        Err(error) => {
+            let message = error.to_string();
+            let expected_message = format!(
+                "fatal: Unable to create '{}': File exists.",
+                index_lockfile.to_str().unwrap()
+            );
+            assert_eq!(message, expected_message);
+        }
+    }
+
+    Ok(())
+}
