@@ -12,14 +12,14 @@ pub fn run_command(args: Vec<String>) -> io::Result<()> {
     let git_dir = workdir.join(".git");
 
     let repository = Repository::from_worktree_root(workdir);
-    let writer = StdoutWriter {};
+    let mut writer = StdoutWriter {};
 
     match sliced_args[..] {
         ["init"] => {
-            init::init(&git_dir, writer)?;
+            init::init(&git_dir, &mut writer)?;
         }
         ["commit"] => {
-            commit::commit(&repository, writer)?;
+            commit::commit(&repository, &mut writer)?;
         }
         ["add", path] => {
             add::add(resolve_path(path)?, &repository)?;

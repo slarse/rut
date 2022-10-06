@@ -76,6 +76,24 @@ fn test_second_commit_gets_proper_parent() -> io::Result<()> {
 }
 
 #[test]
+fn test_first_commit_denoted_as_root_commit_in_status_message() -> io::Result<()> {
+    // arrange
+    let workdir = create_temporary_directory();
+
+    let repository = Repository::from_worktree_root(workdir);
+    rut_init(&repository);
+
+    // act
+    let first_commit_output = commit_with_output_capture("First commit", &repository)?;
+    let second_commit_output = commit_with_output_capture("Second commit", &repository)?;
+
+    assert!(first_commit_output.contains("(root commit)"));
+    assert!(!second_commit_output.contains("(root commit)"));
+
+    Ok(())
+}
+
+#[test]
 fn test_add_directory() -> io::Result<()> {
     // arrange
     let workdir = create_temporary_directory();
@@ -192,8 +210,27 @@ fn test_adding_file_when_index_is_locked() -> io::Result<()> {
 
 fn commit(commit_message: &str, repository: &Repository) -> io::Result<String> {
     fs::write(&repository.git_dir().join("COMMIT_EDITMSG"), commit_message)?;
-    commit::commit(&repository, NoopOutputWriter)?;
+    commit::commit(&repository, &mut NoopOutputWriter)?;
     Ok(get_head_commit(&repository.git_dir()))
+}
+
+fn commit_with_output_capture(commit_message: &str, repository: &Repository) -> io::Result<String> {
+    let mut output_writer = CapturingOutputWriter {
+        output: String::new(),
+    };
+    fs::write(&repository.git_dir().join("COMMIT_EDITMSG"), commit_message)?;
+    commit::commit(&repository, &mut output_writer)?;
+    Ok(output_writer.output)
+}
+
+struct CapturingOutputWriter {
+    output: String,
+}
+
+impl OutputWriter for CapturingOutputWriter {
+    fn write(&mut self, content: String) -> io::Result<()> {
+        Ok(self.output.push_str(content.as_str()))
+    }
 }
 
 struct NoopOutputWriter;
@@ -213,7 +250,7 @@ fn rut_rm(path: &PathBuf, repository: &Repository) {
 }
 
 fn rut_init(repository: &Repository) {
-    init::init(repository.git_dir(), NoopOutputWriter {}).expect("Failed to initialize repo");
+    init::init(repository.git_dir(), &mut NoopOutputWriter).expect("Failed to initialize repo");
 }
 
 fn get_head_commit(git_dir: &PathBuf) -> String {

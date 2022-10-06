@@ -10,7 +10,7 @@ use crate::output::OutputWriter;
 use crate::refs::RefHandler;
 use crate::workspace::Repository;
 
-pub fn commit(repository: &Repository, writer: impl OutputWriter) -> io::Result<()> {
+pub fn commit(repository: &Repository, writer: &mut dyn OutputWriter) -> io::Result<()> {
     let mut index = repository.load_index()?;
 
     let (root_tree, containing_trees) = build_tree(&index.as_mut().get_entries()[..]);
@@ -68,14 +68,14 @@ fn parse_head(head: PathBuf) -> io::Result<String> {
     Ok(trimmed_head_content.trim_start_matches("ref: ").to_owned())
 }
 
-fn write_commit_status(commit: &Commit, mut writer: impl OutputWriter) -> io::Result<()> {
+fn write_commit_status(commit: &Commit, writer: &mut dyn OutputWriter) -> io::Result<()> {
     let first_line = commit
         .message
         .split("\n")
         .next()
         .expect("Not a single line in the commit message");
 
-    let root_commit_notice = commit.parent.map_or("", |_| "(root commit) ");
+    let root_commit_notice = commit.parent.map_or("(root commit) ", |_| "");
 
     let message = format!(
         "[{}{}] {}",
