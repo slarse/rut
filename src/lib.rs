@@ -25,3 +25,5 @@ pub mod rm;
 mod refs;
 
 pub mod output;
+
+pub mod status;

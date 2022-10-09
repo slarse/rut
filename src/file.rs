@@ -5,6 +5,10 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use walkdir::{DirEntry, WalkDir};
+
+use crate::add::GITIGNORE;
+
 pub fn read_file<P: AsRef<Path>>(path: P) -> io::Result<Vec<u8>> {
     let mut file = File::open(path)?;
     let mut bytes: Vec<u8> = Vec::new();
@@ -213,4 +217,43 @@ impl<'a, T: AsVec<u8>> AsMut<T> for LockFileResource<T> {
     fn as_mut(&mut self) -> &mut T {
         &mut self.resource
     }
+}
+
+pub fn resolve_paths<F>(root_path: &Path, filter: F) -> Vec<PathBuf>
+where
+    F: Fn(&DirEntry) -> bool,
+{
+    if root_path.is_dir() {
+        WalkDir::new(&root_path)
+            .into_iter()
+            .filter_entry(|entry| filter(entry) && !(is_hidden(entry) || is_ignored(entry)))
+            .flat_map(|maybe_entry| maybe_entry.map(|entry| PathBuf::from(entry.path())))
+            .filter(|path| path != root_path)
+            .collect()
+    } else {
+        vec![root_path.to_owned()]
+    }
+}
+
+pub fn resolve_files(path: &Path) -> Vec<PathBuf> {
+    resolve_paths(path, |_| true)
+        .into_iter()
+        .filter(|path| path.is_file())
+        .collect()
+}
+
+fn is_hidden(entry: &DirEntry) -> bool {
+    entry
+        .file_name()
+        .to_str()
+        .map(|s| s != "." && s.starts_with("."))
+        .unwrap_or(false)
+}
+
+fn is_ignored(entry: &DirEntry) -> bool {
+    entry
+        .file_name()
+        .to_str()
+        .map(|s| GITIGNORE.contains(&s))
+        .unwrap_or(false)
 }

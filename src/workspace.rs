@@ -77,6 +77,12 @@ impl Repository {
         Ok(LockFileResource::new(lockfile, index))
     }
 
+    pub fn load_index_unlocked(&self) -> io::Result<Index> {
+        let index_file_path = self.git_dir().join("index");
+        let index = Index::from_file(&index_file_path)?;
+        Ok(index)
+    }
+
     pub fn git_dir(&self) -> PathBuf {
         self.worktree.root().join(".git")
     }

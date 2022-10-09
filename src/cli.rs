@@ -1,6 +1,7 @@
 use std::io::Error;
 
 use crate::output::OutputWriter;
+use crate::status;
 use crate::{add, commit, init, rm, workspace::Repository};
 use std::env;
 use std::io;
@@ -26,6 +27,9 @@ pub fn run_command(args: Vec<String>) -> io::Result<()> {
         }
         ["rm", path] => {
             rm::rm(resolve_path(path)?, &repository)?;
+        }
+        ["status"] => {
+            status::status(&repository, &mut writer)?;
         }
         _ => panic!("unexpected command {:?}", sliced_args),
     };

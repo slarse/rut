@@ -197,6 +197,18 @@ impl Index {
         }
     }
 
+    /**
+     * Check whether a path exists as an entry in the index.
+     */
+    pub fn has_entry<P: AsRef<Path>>(&self, path: P) -> bool {
+        let path_ref = path.as_ref();
+        if path_ref.is_dir() {
+            self.directories.contains_key(path_ref)
+        } else {
+            self.entries.contains_key(path_ref)
+        }
+    }
+
     fn remove_directory<P: AsRef<Path>>(&mut self, path: P) {
         if let Some(child_names) = self.directories.remove(path.as_ref()) {
             child_names

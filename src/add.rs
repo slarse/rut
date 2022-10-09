@@ -1,8 +1,4 @@
-use std::{
-    fs, io,
-    path::{Path, PathBuf},
-};
-use walkdir::{DirEntry, WalkDir};
+use std::{fs, io, path::Path};
 
 use crate::{
     file,
@@ -11,7 +7,7 @@ use crate::{
     workspace::Repository,
 };
 
-static GITIGNORE: [&str; 2] = ["Cargo.lock", "target"];
+pub static GITIGNORE: [&str; 2] = ["Cargo.lock", "target"];
 
 pub fn add<P: AsRef<Path>>(path: P, repository: &Repository) -> io::Result<()> {
     if GITIGNORE.contains(&path.as_ref().to_str().expect("Path was bad UTF8")) {
@@ -21,7 +17,7 @@ pub fn add<P: AsRef<Path>>(path: P, repository: &Repository) -> io::Result<()> {
     let absolute_path = repository.worktree().root().join(&path);
     let mut index = repository.load_index()?;
 
-    for path in resolve_files(&absolute_path) {
+    for path in file::resolve_files(&absolute_path) {
         add_file(&path, index.as_mut(), &repository)?;
     }
 
@@ -41,33 +37,4 @@ fn add_file(absolute_path: &Path, index: &mut Index, repository: &Repository) ->
     index.add_entry(entry);
 
     Ok(())
-}
-
-fn resolve_files(path: &Path) -> Vec<PathBuf> {
-    if path.is_dir() {
-        WalkDir::new(&path)
-            .into_iter()
-            .filter_entry(|entry| !(is_hidden(entry) || is_ignored(entry)))
-            .flat_map(|maybe_entry| maybe_entry.map(|entry| PathBuf::from(entry.path())))
-            .filter(|path| path.is_file())
-            .collect()
-    } else {
-        vec![path.to_owned()]
-    }
-}
-
-fn is_hidden(entry: &DirEntry) -> bool {
-    entry
-        .file_name()
-        .to_str()
-        .map(|s| s != "." && s.starts_with("."))
-        .unwrap_or(false)
-}
-
-fn is_ignored(entry: &DirEntry) -> bool {
-    entry
-        .file_name()
-        .to_str()
-        .map(|s| GITIGNORE.contains(&s))
-        .unwrap_or(false)
 }

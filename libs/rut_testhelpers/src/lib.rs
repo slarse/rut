@@ -9,7 +9,7 @@ use std::{
     str,
 };
 
-use rut::{add, commit, init, output::OutputWriter, rm, workspace::Repository};
+use rut::{add, commit, init, status, output::OutputWriter, rm, workspace::Repository};
 
 pub fn rut_commit_with_output_capture(
     commit_message: &str,
@@ -62,7 +62,8 @@ struct CapturingOutputWriter {
 
 impl OutputWriter for CapturingOutputWriter {
     fn write(&mut self, content: String) -> io::Result<()> {
-        Ok(self.output.push_str(content.as_str()))
+        let content_with_line_feed = content + "\n";
+        Ok(self.output.push_str(content_with_line_feed.as_str()))
     }
 }
 
@@ -84,6 +85,12 @@ pub fn rut_rm(path: &PathBuf, repository: &Repository) {
 
 pub fn rut_init(repository: &Repository) {
     init::init(repository.git_dir(), &mut NoopOutputWriter).expect("Failed to initialize repo");
+}
+
+pub fn rut_status(repository: &Repository) -> io::Result<String> {
+    let mut output_writer = CapturingOutputWriter { output: String::new() };
+    status::status(repository, &mut output_writer)?;
+    Ok(output_writer.output)
 }
 
 pub fn assert_healthy_repo(git_dir: &PathBuf) {
