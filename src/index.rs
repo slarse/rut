@@ -240,6 +240,10 @@ impl Index {
         entries.sort_by(|lhs, rhs| lhs.path.cmp(&rhs.path));
         entries
     }
+
+    pub fn get<P: AsRef<Path>>(&self, key: P) -> Option<&IndexEntry> {
+        self.entries.get(key.as_ref())
+    }
 }
 
 impl AsVec<u8> for Index {
