@@ -133,15 +133,15 @@ impl Display for Author {
     }
 }
 
-pub struct Commit<'a> {
-    pub tree: &'a Tree,
+pub struct Commit {
+    pub tree: Tree,
     pub author: Author,
     pub message: String,
-    pub parent: Option<&'a str>,
+    pub parent: Option<String>,
     pub timestamp: u64,
 }
 
-impl<'a> GitObject<'a> for Commit<'a> {
+impl<'a> GitObject<'a> for Commit {
     fn id(&self) -> Vec<u8> {
         let object_format = self.to_object_format();
         let hash = hashing::sha1_hash(&object_format);
@@ -155,7 +155,7 @@ impl<'a> GitObject<'a> for Commit<'a> {
         let timezone = "+0200";
         let author_with_timestamp = format!("{} {} {}", self.author, self.timestamp, timezone);
 
-        let content = match self.parent {
+        let content = match &self.parent {
             Some(parent) => {
                 format!(
                     "tree {}\nparent {}\nauthor {}\ncommitter {}\n\n{}",

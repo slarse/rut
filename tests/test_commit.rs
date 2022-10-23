@@ -98,7 +98,7 @@ fn assert_is_root_tree(repository: &Repository, root_tree_id: &str) {
         .join(&root_tree_id[0..2])
         .join(&root_tree_id[2..]);
 
-    assert_eq!(root_tree_file.is_file(), true);
+    assert!(root_tree_file.is_file());
 
     let git_dir = repository.git_dir();
     let stdout = rut_testhelpers::git_cat_file(&git_dir, "HEAD");

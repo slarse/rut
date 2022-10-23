@@ -4,7 +4,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use std::{fs, io, path::PathBuf};
 
 use crate::hex::to_hex_string;
-use crate::index::{FileMode, IndexEntry};
+use crate::index::{FileMode, Index, IndexEntry};
 use crate::objects::{Author, Commit, GitObject, Tree, TreeEntry};
 use crate::output::OutputWriter;
 use crate::refs::RefHandler;
@@ -13,20 +13,12 @@ use crate::workspace::Repository;
 pub fn commit(repository: &Repository, writer: &mut dyn OutputWriter) -> io::Result<()> {
     let mut index = repository.load_index()?;
 
-    let (root_tree, containing_trees) = build_tree(&index.as_mut().get_entries()[..]);
-    for tree in containing_trees.iter() {
-        repository.database.store_object(tree)?;
-    }
-    repository.database.store_object(&root_tree)?;
-
     let head_ref = parse_head(repository.git_dir().join("HEAD")).expect("HEAD does not exist");
-    let ref_handler = RefHandler::new(&repository);
-    let parent_commit = ref_handler.deref(&head_ref).ok();
-    let commit = create_commit(&root_tree, parent_commit.as_deref(), &repository);
+    let commit = create_commit(&repository, index.as_mut(), &head_ref)?;
     repository.database.store_object(&commit)?;
 
     fs::write(
-        repository.git_dir().join(head_ref),
+        repository.git_dir().join(&head_ref),
         to_hex_string(&commit.id()),
     )?;
 
@@ -35,11 +27,31 @@ pub fn commit(repository: &Repository, writer: &mut dyn OutputWriter) -> io::Res
     Ok(())
 }
 
-fn create_commit<'a>(
-    tree: &'a Tree,
-    parent: Option<&'a str>,
+pub fn create_commit<'a>(
     repository: &'a Repository,
-) -> Commit<'a> {
+    index: &'a mut Index,
+    head_ref: &'a str,
+) -> io::Result<Commit> {
+    let (root_tree, containing_trees) = build_tree(&index.get_entries()[..]);
+    for tree in containing_trees.iter() {
+        repository.database.store_object(tree)?;
+    }
+    repository.database.store_object(&root_tree)?;
+
+    let ref_handler = RefHandler::new(&repository);
+    let parent_commit = ref_handler.deref(&head_ref).ok();
+    Ok(create_commit_with_tree(
+        root_tree,
+        parent_commit,
+        &repository,
+    ))
+}
+
+fn create_commit_with_tree<'a>(
+    tree: Tree,
+    parent: Option<String>,
+    repository: &'a Repository,
+) -> Commit {
     let config = repository.config();
     let author = Author {
         name: config.author_name,
@@ -75,7 +87,7 @@ fn write_commit_status(commit: &Commit, writer: &mut dyn OutputWriter) -> io::Re
         .next()
         .expect("Not a single line in the commit message");
 
-    let root_commit_notice = commit.parent.map_or("(root commit) ", |_| "");
+    let root_commit_notice = commit.parent.to_owned().map_or("(root commit) ", |_| "");
 
     let message = format!(
         "[{}{}] {}",
