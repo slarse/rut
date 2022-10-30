@@ -51,7 +51,7 @@ fn to_object_format(object_type: &str, bytes: &[u8]) -> Vec<u8> {
     object_format
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct TreeEntry {
     pub name: String,
     pub object_id: Vec<u8>,
@@ -73,7 +73,7 @@ impl TreeEntry {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct Tree {
     entries: Vec<TreeEntry>,
 }
@@ -121,6 +121,7 @@ impl<'a> GitObject<'a> for Tree {
     }
 }
 
+#[derive(Debug, PartialEq)]
 pub struct Author {
     pub name: String,
     pub email: String,
@@ -133,6 +134,7 @@ impl Display for Author {
     }
 }
 
+#[derive(Debug, PartialEq)]
 pub struct Commit {
     pub tree: Tree,
     pub author: Author,

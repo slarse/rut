@@ -68,7 +68,11 @@ fn resolve_untracked_paths(worktree: &Worktree, index: &Index) -> Vec<PathBuf> {
     file::resolve_paths(worktree.root(), untracked_paths_filter)
 }
 
-fn get_modified_paths(tracked_paths: &[PathBuf], worktree: &Worktree, index: &Index) -> Vec<PathBuf> {
+fn get_modified_paths(
+    tracked_paths: &[PathBuf],
+    worktree: &Worktree,
+    index: &Index,
+) -> Vec<PathBuf> {
     tracked_paths
         .into_iter()
         .filter(|path| {
