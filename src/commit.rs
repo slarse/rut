@@ -17,10 +17,7 @@ pub fn commit(repository: &Repository, writer: &mut dyn OutputWriter) -> io::Res
     let commit = create_commit(&repository, index.as_mut(), &head_ref)?;
     repository.database.store_object(&commit)?;
 
-    fs::write(
-        repository.git_dir().join(&head_ref),
-        commit.id_as_string(),
-    )?;
+    fs::write(repository.git_dir().join(&head_ref), commit.id_as_string())?;
 
     write_commit_status(&commit, writer)?;
 

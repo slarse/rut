@@ -56,7 +56,7 @@ impl Database {
         Ok(compressed_bytes)
     }
 
-    pub fn read_commit<P: AsRef<Path>>(&self, object_path: P) -> io::Result<Commit> {
+    pub fn load_commit<P: AsRef<Path>>(&self, object_path: P) -> io::Result<Commit> {
         let data = Database::decompress(object_path)?;
 
         let space = ' ' as u8;
@@ -82,30 +82,28 @@ impl Database {
     fn parse_commit(&self, content: &mut impl Iterator<Item = u8>) -> Commit {
         let tree_line = next_line(content);
         let author_or_parent_line = next_line(content);
-        let is_not_space = |item: &u8| *item != 32;
 
-        let (author_line, parent) = {
+        let space = ' ' as u8;
+        let is_not_space = |item: &u8| *item != space;
+
+        let (parent_line, author_line) = {
             let line_start_bytes: Vec<u8> = author_or_parent_line
                 .iter()
                 .map(|byte| byte.to_owned())
                 .take_while(is_not_space)
                 .collect();
             let line_start = str::from_utf8(&line_start_bytes).unwrap();
-
             if line_start == "parent" {
-                let parent_oid_bytes: Vec<u8> = author_or_parent_line
-                    .iter()
-                    .map(|byte| byte.to_owned())
-                    .skip_while(is_not_space)
-                    .collect();
-                let parent_oid = str::from_utf8(&parent_oid_bytes).unwrap();
-                (next_line(content), Some(parent_oid.trim().to_owned()))
+                (Some(author_or_parent_line), next_line(content))
             } else if line_start == "author" {
-                (author_or_parent_line, None)
+                (None, author_or_parent_line)
             } else {
                 panic!("failed to parse commit");
             }
         };
+
+        let parent = self.parse_parent(parent_line.as_ref());
+        let (author_name, author_email, timestamp) = parse_author_details(&author_line);
 
         let tree_object_id_bytes: Vec<u8> =
             tree_line.into_iter().skip_while(is_not_space).collect();
@@ -116,10 +114,9 @@ impl Database {
 
         let _committer_line = next_line(content); // TODO handle committer line
         let _empty_line = next_line(content);
-        let message = next_line(content);
+        let message_bytes = next_line(content); // TODO handle multiline messages
 
-        let (author_name, author_email, timestamp) = parse_author_details(&author_line);
-        let message = str::from_utf8(&message).unwrap().to_owned();
+        let message = str::from_utf8(&message_bytes).unwrap().to_owned();
 
         let author = Author {
             name: author_name,
@@ -133,6 +130,21 @@ impl Database {
             parent,
             timestamp,
         }
+    }
+
+    fn parse_parent(&self, parent_line: Option<&Vec<u8>>) -> Option<String> {
+        parent_line
+            .map(|parent_line| {
+                let parent_oid_bytes: Vec<u8> = parent_line
+                    .iter()
+                    .map(|byte| byte.to_owned())
+                    .skip_while(|byte| *byte != (' ' as u8))
+                    .collect();
+                str::from_utf8(&parent_oid_bytes)
+                    .ok()
+                    .map(|parent| parent.trim().to_owned())
+            })
+            .flatten()
     }
 
     fn decompress<P: AsRef<Path>>(path: P) -> io::Result<Vec<u8>> {
@@ -162,7 +174,7 @@ fn parse_author_details(author_line: &[u8]) -> (String, String, u64) {
 }
 
 fn next_line(iter: &mut impl Iterator<Item = u8>) -> Vec<u8> {
-    let is_not_newline = |item: &u8| *item != 10;
+    let is_not_newline = |item: &u8| *item != ('\n' as u8);
     take_while(iter, is_not_newline)
 }
 
@@ -180,21 +192,23 @@ fn take_while<T>(iter: &mut impl Iterator<Item = T>, predicate: fn(&T) -> bool) 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::objects::{Author, Tree};
+    use crate::{
+        index::FileMode,
+        objects::{Author, Tree, TreeEntry},
+    };
     use rut_testhelpers;
 
     #[test]
-    fn test_read_empty_commit_without_parent() -> io::Result<()> {
+    fn test_read_commit_without_parent() -> io::Result<()> {
         // arrange
         let workdir = rut_testhelpers::create_temporary_directory();
         let database = Database::new(workdir);
 
-        let commit = create_empty_commit(None);
-
+        let commit = create_commit(None);
         let commit_path = database.store_object(&commit)?;
 
         // act
-        let parsed_commit = database.read_commit(&commit_path)?;
+        let parsed_commit = database.load_commit(&commit_path)?;
 
         // assert
         assert_eq!(parsed_commit, commit);
@@ -208,23 +222,30 @@ mod tests {
         let workdir = rut_testhelpers::create_temporary_directory();
         let database = Database::new(workdir);
 
-        let first_commit = create_empty_commit(None);
+        let first_commit = create_commit(None);
         let first_commit_oid = first_commit.id_as_string();
-        let second_commit = create_empty_commit(Some(first_commit_oid));
+        let second_commit = create_commit(Some(first_commit_oid));
 
         database.store_object(&first_commit)?;
         let second_commit_path = database.store_object(&second_commit)?;
 
         // act
-        let parsed_commit = database.read_commit(&second_commit_path)?;
+        let parsed_commit = database.load_commit(&second_commit_path)?;
 
         // assert
         assert_eq!(parsed_commit, second_commit);
         Ok(())
     }
 
-    fn create_empty_commit(parent: Option<String>) -> Commit {
-        let tree = Tree::new(vec![]).id_as_string();
+    fn create_commit(parent: Option<String>) -> Commit {
+        let tree_entry = TreeEntry {
+            name: String::from("file.txt"),
+            object_id: "ce013625030ba8dba906f756967f9e9ca394464a"
+                .as_bytes()
+                .to_owned(),
+            mode: FileMode::Regular,
+        };
+        let tree = Tree::new(vec![tree_entry]).id_as_string();
         let author = Author {
             name: String::from("Full Name"),
             email: String::from("name@example.com"),
