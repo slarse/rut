@@ -17,7 +17,7 @@ use crate::file;
 use crate::file::{LockFile, LockFileResource};
 use crate::hex;
 use crate::index::Index;
-use crate::objects::{Author, Commit, GitObject, Tree};
+use crate::objects::{Author, Commit, GitObject};
 
 pub struct Database {
     git_dir: PathBuf,
@@ -109,7 +109,10 @@ impl Database {
 
         let tree_object_id_bytes: Vec<u8> =
             tree_line.into_iter().skip_while(is_not_space).collect();
-        let _tree_object_id = str::from_utf8(&tree_object_id_bytes).unwrap().to_owned();
+        let tree_object_id = str::from_utf8(&tree_object_id_bytes)
+            .unwrap()
+            .trim()
+            .to_owned();
 
         let _committer_line = next_line(content); // TODO handle committer line
         let _empty_line = next_line(content);
@@ -122,10 +125,9 @@ impl Database {
             name: author_name,
             email: author_email,
         };
-        let tree = Tree::new(Vec::new());
 
         Commit {
-            tree,
+            tree: tree_object_id,
             author,
             message,
             parent,
@@ -207,7 +209,7 @@ mod tests {
         let database = Database::new(workdir);
 
         let first_commit = create_empty_commit(None);
-        let first_commit_oid = hex::to_hex_string(&first_commit.id());
+        let first_commit_oid = first_commit.id_as_string();
         let second_commit = create_empty_commit(Some(first_commit_oid));
 
         database.store_object(&first_commit)?;
@@ -222,7 +224,7 @@ mod tests {
     }
 
     fn create_empty_commit(parent: Option<String>) -> Commit {
-        let tree = Tree::new(vec![]);
+        let tree = Tree::new(vec![]).id_as_string();
         let author = Author {
             name: String::from("Full Name"),
             email: String::from("name@example.com"),

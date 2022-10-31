@@ -19,7 +19,7 @@ pub fn commit(repository: &Repository, writer: &mut dyn OutputWriter) -> io::Res
 
     fs::write(
         repository.git_dir().join(&head_ref),
-        to_hex_string(&commit.id()),
+        commit.id_as_string(),
     )?;
 
     write_commit_status(&commit, writer)?;
@@ -41,14 +41,14 @@ pub fn create_commit<'a>(
     let ref_handler = RefHandler::new(&repository);
     let parent_commit = ref_handler.deref(&head_ref).ok();
     Ok(create_commit_with_tree(
-        root_tree,
+        root_tree.id_as_string(),
         parent_commit,
         &repository,
     ))
 }
 
 fn create_commit_with_tree<'a>(
-    tree: Tree,
+    tree: String,
     parent: Option<String>,
     repository: &'a Repository,
 ) -> Commit {

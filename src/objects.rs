@@ -1,11 +1,15 @@
 use std::{fmt::Display, path::PathBuf, str};
 
 use crate::hashing;
-use crate::hex::{self, unhexlify};
+use crate::hex;
 use crate::index::FileMode;
 
 pub trait GitObject<'a> {
     fn id(&'a self) -> Vec<u8>;
+
+    fn id_as_string(&'a self) -> String {
+        hex::to_hex_string(&self.id())
+    }
 
     fn short_id(&'a self) -> Vec<u8> {
         self.id()[0..7].to_vec()
@@ -96,7 +100,7 @@ impl<'a> GitObject<'a> for Tree {
     fn id(&'a self) -> Vec<u8> {
         let object_format = self.to_object_format();
         let hash = hashing::sha1_hash(&object_format);
-        unhexlify(&hash)
+        hex::unhexlify(&hash)
     }
 
     fn to_object_format(&self) -> Vec<u8> {
@@ -136,7 +140,7 @@ impl Display for Author {
 
 #[derive(Debug, PartialEq)]
 pub struct Commit {
-    pub tree: Tree,
+    pub tree: String,
     pub author: Author,
     pub message: String,
     pub parent: Option<String>,
@@ -147,12 +151,10 @@ impl<'a> GitObject<'a> for Commit {
     fn id(&self) -> Vec<u8> {
         let object_format = self.to_object_format();
         let hash = hashing::sha1_hash(&object_format);
-        unhexlify(&hash)
+        hex::unhexlify(&hash)
     }
 
     fn to_object_format(&self) -> Vec<u8> {
-        let tree_string = hex::to_hex_string(&self.tree.id());
-
         // TODO get timezone from system
         let timezone = "+0200";
         let author_with_timestamp = format!("{} {} {}", self.author, self.timestamp, timezone);
@@ -161,17 +163,13 @@ impl<'a> GitObject<'a> for Commit {
             Some(parent) => {
                 format!(
                     "tree {}\nparent {}\nauthor {}\ncommitter {}\n\n{}",
-                    &tree_string,
-                    parent,
-                    author_with_timestamp,
-                    author_with_timestamp,
-                    self.message
+                    self.tree, parent, author_with_timestamp, author_with_timestamp, self.message
                 )
             }
             None => {
                 format!(
                     "tree {}\nauthor {}\ncommitter {}\n\n{}",
-                    &tree_string, author_with_timestamp, author_with_timestamp, self.message
+                    self.tree, author_with_timestamp, author_with_timestamp, self.message
                 )
             }
         };
