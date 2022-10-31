@@ -169,7 +169,7 @@ fn parse_author_details(author_line: &[u8]) -> (String, String, u64) {
         .iter()
         .collect::<String>()
         .parse::<u64>()
-        .unwrap();
+        .unwrap_or(0);
     (name.trim().to_owned(), email.trim().to_owned(), timestamp)
 }
 
