@@ -117,7 +117,7 @@ impl Database {
 
         let _committer_line = next_line(content); // TODO handle committer line
         let _empty_line = next_line(content);
-        let message_bytes = next_line(content); // TODO handle multiline messages
+        let message_bytes: Vec<u8> = content.collect();
 
         let message = str::from_utf8(&message_bytes).unwrap().to_owned();
 
@@ -202,7 +202,7 @@ mod tests {
     use rut_testhelpers;
 
     #[test]
-    fn test_read_commit_without_parent() -> io::Result<()> {
+    fn test_parse_without_parent() -> io::Result<()> {
         // arrange
         let workdir = rut_testhelpers::create_temporary_directory();
         let database = Database::new(workdir);
@@ -215,12 +215,13 @@ mod tests {
 
         // assert
         assert_eq!(parsed_commit, commit);
+        assert_eq!(parsed_commit.id_as_string(), commit.id_as_string());
 
         Ok(())
     }
 
     #[test]
-    fn test_read_empty_commit_with_parent() -> io::Result<()> {
+    fn test_parse_commit_with_parent() -> io::Result<()> {
         // arrange
         let workdir = rut_testhelpers::create_temporary_directory();
         let database = Database::new(workdir);
@@ -237,6 +238,7 @@ mod tests {
 
         // assert
         assert_eq!(parsed_commit, second_commit);
+        assert_eq!(parsed_commit.id_as_string(), second_commit.id_as_string());
         Ok(())
     }
 
@@ -256,7 +258,7 @@ mod tests {
         Commit {
             tree,
             author,
-            message: String::from("Initial commit"),
+            message: String::from("Initial commit\n"),
             parent,
             timestamp: 1666811962,
         }
