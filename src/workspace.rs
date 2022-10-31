@@ -56,7 +56,10 @@ impl Database {
         Ok(compressed_bytes)
     }
 
-    pub fn load_commit<P: AsRef<Path>>(&self, object_path: P) -> io::Result<Commit> {
+    pub fn load_commit(&self, commit_id: &[u8]) -> io::Result<Commit> {
+        let dirname = hex::to_hex_string(&commit_id[..2]);
+        let filename = hex::to_hex_string(&commit_id[2..]);
+        let object_path = self.git_dir.join("objects").join(dirname).join(filename);
         let data = Database::decompress(object_path)?;
 
         let space = ' ' as u8;
@@ -205,10 +208,10 @@ mod tests {
         let database = Database::new(workdir);
 
         let commit = create_commit(None);
-        let commit_path = database.store_object(&commit)?;
+        database.store_object(&commit)?;
 
         // act
-        let parsed_commit = database.load_commit(&commit_path)?;
+        let parsed_commit = database.load_commit(&commit.id())?;
 
         // assert
         assert_eq!(parsed_commit, commit);
@@ -227,10 +230,10 @@ mod tests {
         let second_commit = create_commit(Some(first_commit_oid));
 
         database.store_object(&first_commit)?;
-        let second_commit_path = database.store_object(&second_commit)?;
+        database.store_object(&second_commit)?;
 
         // act
-        let parsed_commit = database.load_commit(&second_commit_path)?;
+        let parsed_commit = database.load_commit(&second_commit.id())?;
 
         // assert
         assert_eq!(parsed_commit, second_commit);
