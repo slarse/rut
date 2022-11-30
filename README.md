@@ -14,6 +14,34 @@ I periodically push changes just so I have a backup of my project.
 > subset of Git in Ruby. I HIGHLY recommend it if you are interested in learning
 > more about Git.
 
+## How to use
+
+`rut` requires Rust and Cargo to be installed. It's been tested to work on
+Rust/Cargo version 1.61. Your mileage may vary on other versions.
+
+To try `rut` out, clone the repository and build the project:
+
+```bash
+$ git clone https://github.com/slarse/rut.git
+$ cd rut
+$ cargo build
+```
+
+Then you can run commands like so:
+
+```bash
+$ cargo run <command>
+```
+
+For example, the commands I will run to commit this update of the README are
+the following:
+
+```bash
+$ cargo run add README.md
+$ echo 'Add usage instructions to README' > .git/COMMIT_EDITMSG
+$ cargo run commit
+```
+
 ## Current features
 
 Rut currently supports the following subset of Git:
@@ -38,4 +66,4 @@ Rut currently supports the following subset of Git:
 ## Upcoming features
 
 I'm currently working on improving the `status` command to show more stuff than
-just 
+just untracked and modified files.
