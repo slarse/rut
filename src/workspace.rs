@@ -16,8 +16,9 @@ use crate::config::Config;
 use crate::file;
 use crate::file::{LockFile, LockFileResource};
 use crate::hex;
+use crate::index::FileMode;
 use crate::index::Index;
-use crate::objects::{Author, Commit, GitObject};
+use crate::objects::{Author, Commit, GitObject, Tree, TreeEntry};
 
 pub struct Database {
     git_dir: PathBuf,
@@ -57,16 +58,21 @@ impl Database {
     }
 
     pub fn load_commit(&self, commit_id: &[u8]) -> io::Result<Commit> {
-        let dirname = hex::to_hex_string(&commit_id[..2]);
-        let filename = hex::to_hex_string(&commit_id[2..]);
+        let content = self.load_data(commit_id)?;
+        Ok(self.parse_commit(&mut content.into_iter()))
+    }
+
+    fn load_data(&self, object_id: &[u8]) -> io::Result<Vec<u8>> {
+        let dirname = hex::to_hex_string(&object_id[..2]);
+        let filename = hex::to_hex_string(&object_id[2..]);
         let object_path = self.git_dir.join("objects").join(dirname).join(filename);
         let data = Database::decompress(object_path)?;
 
-        let space = ' ' as u8;
+        // TODO handle bad/unexpected object type
         let object_type: Vec<u8> = data
             .iter()
             .map(|byte| byte.to_owned())
-            .take_while(|byte| byte != &space)
+            .take_while(|byte| byte != &(' ' as u8))
             .collect();
 
         let size_start = object_type.len() + 1;
@@ -77,9 +83,9 @@ impl Database {
             .collect();
 
         let content_start = size_start + size.len() + 1;
-        let mut content = data[content_start..].to_owned().into_iter();
+        let content = data[content_start..].to_owned();
 
-        Ok(self.parse_commit(&mut content))
+        Ok(content)
     }
 
     fn parse_commit(&self, content: &mut impl Iterator<Item = u8>) -> Commit {
@@ -150,6 +156,12 @@ impl Database {
             .flatten()
     }
 
+    pub fn load_tree(&self, tree_id: &[u8]) -> io::Result<Tree> {
+        let content = self.load_data(tree_id)?;
+        let tree_entries = parse_tree_entries(&mut content.into_iter());
+        Ok(Tree::new(tree_entries))
+    }
+
     fn decompress<P: AsRef<Path>>(path: P) -> io::Result<Vec<u8>> {
         let file = File::open(path)?;
         let reader = BufReader::new(file);
@@ -176,6 +188,41 @@ fn parse_author_details(author_line: &[u8]) -> (String, String, u64) {
     (name.trim().to_owned(), email.trim().to_owned(), timestamp)
 }
 
+fn parse_tree_entries(content: &mut impl Iterator<Item = u8>) -> Vec<TreeEntry> {
+    let mut peekable_content = content.peekable();
+    let mut entries = vec![];
+
+    while peekable_content.peek().is_some() {
+        let entry = parse_tree_entry(&mut peekable_content);
+        entries.push(entry);
+    }
+
+    entries
+}
+
+fn parse_tree_entry(content: &mut impl Iterator<Item = u8>) -> TreeEntry {
+    let mode_bytes = take_while(content, |byte: &u8| *byte != ' ' as u8);
+    let name_bytes = take_while(content, |byte| *byte != 0);
+    let object_id = hex::unhexlify(&content.take(20).collect::<Vec<u8>>());
+
+    // TODO handle bad mode bytes
+    let mode = match str::from_utf8(&mode_bytes).unwrap() {
+        "40000" => FileMode::Directory,
+        "100644" => FileMode::Regular,
+        "100755" => FileMode::Executable,
+        unknown_mode => panic!("Unknown mode: {}", unknown_mode),
+    };
+
+    // TODO handle bad name bytes
+    let name = str::from_utf8(&name_bytes).unwrap().to_owned();
+
+    TreeEntry {
+        name,
+        object_id,
+        mode,
+    }
+}
+
 fn next_line(iter: &mut impl Iterator<Item = u8>) -> Vec<u8> {
     let is_not_newline = |item: &u8| *item != ('\n' as u8);
     take_while(iter, is_not_newline)
@@ -200,6 +247,84 @@ mod tests {
         objects::{Author, Tree, TreeEntry},
     };
     use rut_testhelpers;
+
+    #[test]
+    fn test_load_empty_tree() -> io::Result<()> {
+        // arrange
+        let workdir = rut_testhelpers::create_temporary_directory();
+        let database = Database::new(workdir);
+
+        let empty_tree = Tree::new(vec![]);
+        database.store_object(&empty_tree)?;
+
+        // act
+        let parsed_tree = database.load_tree(&empty_tree.id())?;
+
+        // assert
+        assert_eq!(parsed_tree, empty_tree);
+        assert_eq!(parsed_tree.id_as_string(), empty_tree.id_as_string());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_load_single_entry_tree() -> io::Result<()> {
+        // arrange
+        let workdir = rut_testhelpers::create_temporary_directory();
+        let database = Database::new(workdir);
+
+        let entry = TreeEntry {
+            name: String::from("file.txt"),
+            object_id: hex::from_hex_string(&"097711d5840f84b87f5567843471e886f5733d9a").unwrap(),
+            mode: FileMode::Regular,
+        };
+        let tree = Tree::new(vec![entry]);
+        database.store_object(&tree)?;
+
+        // act
+        let parsed_tree = database.load_tree(&tree.id())?;
+
+        // assert
+        assert_eq!(parsed_tree, tree);
+        assert_eq!(parsed_tree.id_as_string(), tree.id_as_string());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_load_multiple_entry_tree() -> io::Result<()> {
+        // arrange
+        let workdir = rut_testhelpers::create_temporary_directory();
+        let database = Database::new(workdir);
+
+        let regular_file_entry = TreeEntry {
+            name: String::from("file.txt"),
+            object_id: hex::from_hex_string(&"097711d5840f84b87f5567843471e886f5733d9a").unwrap(),
+            mode: FileMode::Regular,
+        };
+        let executable_file_entry = TreeEntry {
+            name: String::from("other_file.txt"),
+            object_id: hex::from_hex_string(&"097711d5840f84b87f5567843471e886f5733d9a").unwrap(),
+            mode: FileMode::Executable,
+        };
+        let dir_entry = TreeEntry {
+            name: String::from("libs"),
+            object_id: hex::from_hex_string(&"a2db0a195a522272a018af06515a439bb5ec5ceb").unwrap(),
+            mode: FileMode::Directory,
+        };
+
+        let tree = Tree::new(vec![regular_file_entry, executable_file_entry, dir_entry]);
+        database.store_object(&tree)?;
+
+        // act
+        let parsed_tree = database.load_tree(&tree.id())?;
+
+        // assert
+        assert_eq!(parsed_tree, tree);
+        assert_eq!(parsed_tree.id_as_string(), tree.id_as_string());
+
+        Ok(())
+    }
 
     #[test]
     fn test_parse_without_parent() -> io::Result<()> {

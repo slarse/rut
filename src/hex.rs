@@ -6,6 +6,12 @@ pub fn to_hex_string(bytes: &[u8]) -> String {
         .join("")
 }
 
+pub fn from_hex_string(hex: &str) -> Option<Vec<u8>> {
+    hex.chars()
+        .map(|chr| u8::from_str_radix(&chr.to_string(), 16).ok())
+        .collect()
+}
+
 pub fn unhexlify(bytes: &[u8]) -> Vec<u8> {
     let mut unhexlified = Vec::new();
     for i in 0..bytes.len() {
