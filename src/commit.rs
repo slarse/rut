@@ -13,7 +13,7 @@ use crate::workspace::Repository;
 pub fn commit(repository: &Repository, writer: &mut dyn OutputWriter) -> io::Result<()> {
     let mut index = repository.load_index()?;
 
-    let head_ref = parse_head(repository.git_dir().join("HEAD")).expect("HEAD does not exist");
+    let head_ref = repository.head().expect("HEAD does not exist");
     let commit = create_commit(&repository, index.as_mut(), &head_ref)?;
     repository.database.store_object(&commit)?;
 
@@ -69,12 +69,6 @@ fn create_commit_with_tree<'a>(
         parent,
         timestamp,
     }
-}
-
-fn parse_head(head: PathBuf) -> io::Result<String> {
-    let head_content = fs::read_to_string(&head)?;
-    let trimmed_head_content = head_content.trim();
-    Ok(trimmed_head_content.trim_start_matches("ref: ").to_owned())
 }
 
 fn write_commit_status(commit: &Commit, writer: &mut dyn OutputWriter) -> io::Result<()> {

@@ -109,3 +109,28 @@ fn test_shows_modified_file() -> io::Result<()> {
 
     Ok(())
 }
+
+#[test]
+fn test_shows_modified_staged_file_in_subdirectory() -> io::Result<()> {
+    // arrange
+    let workdir = rut_testhelpers::create_temporary_directory();
+    let repository = Repository::from_worktree_root(&workdir);
+    rut_testhelpers::rut_init(&repository);
+
+    let directory = workdir.join("dir");
+    fs::create_dir(&directory)?;
+    let file = directory.join("file.txt");
+    fs::write(&file, "content")?;
+    rut_testhelpers::rut_add(&file, &repository);
+    rut_testhelpers::rut_commit("First commit", &repository)?;
+    fs::write(&file, "more content")?;
+    rut_testhelpers::rut_add(&file, &repository);
+
+    // act
+    let output = rut_testhelpers::rut_status(&repository)?;
+
+    // assert
+    assert_eq!(output, "M  dir/file.txt\n");
+
+    Ok(())
+}

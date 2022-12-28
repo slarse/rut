@@ -19,6 +19,7 @@ use crate::hex;
 use crate::index::FileMode;
 use crate::index::Index;
 use crate::objects::{Author, Commit, GitObject, Tree, TreeEntry};
+use crate::refs::RefHandler;
 
 pub struct Database {
     git_dir: PathBuf,
@@ -169,6 +170,41 @@ impl Database {
         let mut buf = Vec::new();
         decoder.read_to_end(&mut buf)?;
         Ok(buf)
+    }
+
+    pub fn print_paths(&self, path: String, tree: &Tree) -> io::Result<()> {
+        let mut accumulator = vec![];
+        self.extract_paths_from_tree(path, tree, &mut accumulator)?;
+        for (object_id, file_path) in accumulator {
+            println!("{} {}", object_id, file_path);
+        }
+        Ok(())
+    }
+
+    pub fn extract_paths_from_tree(
+        &self,
+        base_path: String,
+        tree: &Tree,
+        accumulator: &mut Vec<(String, String)>,
+    ) -> io::Result<()> {
+        for tree_entry in tree.entries() {
+            let next_path = if base_path == "" {
+                String::from(&tree_entry.name)
+            } else {
+                format!("{}/{}", &base_path, &tree_entry.name)
+            };
+            match tree_entry.mode {
+                FileMode::Directory => {
+                    let tree = self.load_tree(&tree_entry.object_id)?;
+                    self.extract_paths_from_tree(next_path, &tree, accumulator)?;
+                }
+                _ => {
+                    accumulator.push((hex::to_hex_string(&tree_entry.object_id), next_path));
+                }
+            }
+        }
+
+        Ok(())
     }
 }
 
@@ -433,6 +469,18 @@ impl Repository {
 
     pub fn config(&self) -> Config {
         config::read_config().unwrap()
+    }
+
+    pub fn head(&self) -> io::Result<String> {
+        let head_file = self.git_dir().join("HEAD");
+        let head_content = fs::read_to_string(&head_file)?;
+        let trimmed_head_content = head_content.trim();
+        Ok(trimmed_head_content.trim_start_matches("ref: ").to_owned())
+    }
+
+    pub fn head_commit(&self) -> io::Result<String> {
+        let head = self.head()?;
+        RefHandler::new(&self).deref(&head)
     }
 }
 
