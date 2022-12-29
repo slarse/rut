@@ -52,16 +52,8 @@ fn print_paths(
 }
 
 fn resolve_tracked_paths(worktree: &Worktree, index: &Index) -> Vec<PathBuf> {
-    let tracked_paths_filter = |entry: &DirEntry| {
-        if entry.path().is_dir() {
-            return true;
-        }
-
-        let relative_path = worktree.relativize_path(entry.path());
-        index.has_entry(&relative_path)
-    };
-
-    file::resolve_paths(worktree.root(), tracked_paths_filter)
+    let root = worktree.root();
+    index.get_entries().iter().map(|entry| root.join(&entry.path)).collect()
 }
 
 fn resolve_untracked_paths(worktree: &Worktree, index: &Index) -> Vec<PathBuf> {
