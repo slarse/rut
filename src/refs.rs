@@ -38,4 +38,12 @@ impl<'a> RefHandler<'a> {
 
         Ok(result)
     }
+
+    /**
+     * Convenience method to get the current head commit.
+     */
+    pub fn head(&self) -> io::Result<String> {
+        let head = self.repository.head()?;
+        self.deref(&head)
+    }
 }

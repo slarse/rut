@@ -9,6 +9,7 @@ use crate::file;
 use crate::hex;
 use crate::index::Index;
 use crate::output::OutputWriter;
+use crate::refs::RefHandler;
 use crate::workspace::{Repository, Worktree};
 
 pub fn status(repository: &Repository, writer: &mut dyn OutputWriter) -> io::Result<()> {
@@ -86,7 +87,7 @@ fn resolve_modified_staged_paths(
     repository: &Repository,
     index: &Index,
 ) -> io::Result<Vec<PathBuf>> {
-    let head_commit_id_opt = repository.head_commit();
+    let head_commit_id_opt = RefHandler::new(&repository).head();
     if head_commit_id_opt.is_err() {
         return Ok(vec![]);
     }

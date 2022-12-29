@@ -19,7 +19,6 @@ use crate::hex;
 use crate::index::FileMode;
 use crate::index::Index;
 use crate::objects::{Author, Commit, GitObject, Tree, TreeEntry};
-use crate::refs::RefHandler;
 
 pub struct Database {
     git_dir: PathBuf,
@@ -476,11 +475,6 @@ impl Repository {
         let head_content = fs::read_to_string(&head_file)?;
         let trimmed_head_content = head_content.trim();
         Ok(trimmed_head_content.trim_start_matches("ref: ").to_owned())
-    }
-
-    pub fn head_commit(&self) -> io::Result<String> {
-        let head = self.head()?;
-        RefHandler::new(&self).deref(&head)
     }
 }
 
