@@ -19,10 +19,12 @@ pub fn status(repository: &Repository, writer: &mut dyn OutputWriter) -> io::Res
     let tracked_paths = resolve_tracked_paths(&worktree, &unlocked_index);
     let modified_paths = get_modified_paths(&tracked_paths, &worktree, &unlocked_index);
     let untracked_paths = resolve_untracked_paths(&worktree, &unlocked_index);
-    let staged_paths = resolve_modified_staged_paths(&repository, &unlocked_index)?;
+    let (modified_staged_paths, created_staged_paths) =
+        resolve_staged_paths(&repository, &unlocked_index)?;
 
     print_paths(modified_paths, " M", &worktree, writer)?;
-    print_paths(staged_paths, "M ", &worktree, writer)?;
+    print_paths(modified_staged_paths, "M ", &worktree, writer)?;
+    print_paths(created_staged_paths, "A ", &worktree, writer)?;
     print_paths(untracked_paths, "??", &worktree, writer)?;
 
     Ok(())
@@ -83,13 +85,34 @@ fn resolve_untracked_paths(worktree: &Worktree, index: &Index) -> Vec<PathBuf> {
     file::resolve_paths(worktree.root(), untracked_paths_filter)
 }
 
-fn resolve_modified_staged_paths(
+fn resolve_staged_paths(
     repository: &Repository,
     index: &Index,
-) -> io::Result<Vec<PathBuf>> {
+) -> io::Result<(Vec<PathBuf>, Vec<PathBuf>)> {
+    let staged_paths_filter = |entry: &DirEntry| {
+        if entry.path().is_dir() {
+            return true;
+        }
+
+        let relative_path = repository.worktree().relativize_path(entry.path());
+        let is_staged = index.has_entry(relative_path);
+
+        is_staged
+    };
+
+    let staged_paths: Vec<PathBuf> =
+        file::resolve_paths(repository.worktree().root(), staged_paths_filter)
+            .into_iter()
+            .filter(|path| path.is_file())
+            .collect();
+
+    split_staged_paths_into_modified_and_created(&staged_paths, repository, index)
+}
+
+fn resolve_commited_paths_and_ids(repository: &Repository) -> io::Result<HashMap<PathBuf, String>> {
     let head_commit_id_opt = RefHandler::new(&repository).head();
     if head_commit_id_opt.is_err() {
-        return Ok(vec![]);
+        return Ok(HashMap::new());
     }
     let head_commit_id = head_commit_id_opt.ok().unwrap();
 
@@ -109,30 +132,33 @@ fn resolve_modified_staged_paths(
         .map(|(id, path)| (PathBuf::from(path), id))
         .collect();
 
-    let staged_paths_filter = |entry: &DirEntry| {
-        if entry.path().is_dir() {
-            return true;
+    Ok(path_to_id)
+}
+
+fn split_staged_paths_into_modified_and_created(
+    staged_paths: &[PathBuf],
+    repository: &Repository,
+    index: &Index,
+) -> io::Result<(Vec<PathBuf>, Vec<PathBuf>)> {
+    let path_to_committed_id = resolve_commited_paths_and_ids(&repository)?;
+    let mut modified_paths = vec![];
+    let mut created_paths = vec![];
+
+    for path in staged_paths {
+        let relative_path = repository.worktree().relativize_path(path);
+        match path_to_committed_id.get(&relative_path) {
+            Some(committed_object_id) => {
+                let indexed_object_id =
+                    hex::to_hex_string(&index.get(&relative_path).unwrap().object_id);
+                if *committed_object_id != indexed_object_id {
+                    modified_paths.push(path.to_owned())
+                }
+            }
+            None => created_paths.push(path.to_owned()),
         }
+    }
 
-        let relative_path = repository.worktree().relativize_path(entry.path());
-        let is_staged = index
-            .get(&relative_path)
-            .map(|index_entry| hex::to_hex_string(&index_entry.object_id))
-            .map_or(false, |object_id| {
-                path_to_id
-                    .get(&relative_path)
-                    .map_or(false, |id_in_commit| *id_in_commit != object_id)
-            });
-
-        is_staged
-    };
-
-    Ok(
-        file::resolve_paths(repository.worktree().root(), staged_paths_filter)
-            .into_iter()
-            .filter(|path| path.is_file())
-            .collect(),
-    )
+    Ok((modified_paths, created_paths))
 }
 
 fn get_modified_paths(
