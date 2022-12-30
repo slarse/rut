@@ -18,19 +18,19 @@ pub fn status(repository: &Repository, writer: &mut dyn OutputWriter) -> io::Res
     let path_to_committed_id = resolve_committed_paths_and_ids(&repository)?;
 
     let tracked_paths = resolve_tracked_paths(&path_to_committed_id, &worktree, &unlocked_index);
-    let modified_paths = get_modified_paths(&tracked_paths, &worktree, &unlocked_index);
-    let deleted_unstaged_paths = tracked_paths
-        .iter()
-        .filter(|path| !path.exists())
-        .map(|path| path.to_owned())
-        .collect();
+    let modified_unstaged_paths =
+        resolve_modified_unstaged_paths(&tracked_paths, &worktree, &unlocked_index);
+    let deleted_unstaged_paths = resolve_deleted_unstaged_paths(&tracked_paths);
     let untracked_paths = resolve_untracked_paths(&tracked_paths, &worktree, &unlocked_index);
-    let (modified_staged_paths, created_staged_paths) =
-        resolve_staged_paths(&path_to_committed_id, &repository, &unlocked_index)?;
+    let (modified_staged_paths, created_staged_paths) = resolve_modified_and_created_staged_paths(
+        &path_to_committed_id,
+        &repository,
+        &unlocked_index,
+    )?;
     let deleted_staged_paths =
         resolve_deleted_staged_paths(&path_to_committed_id, &worktree.root(), &unlocked_index);
 
-    print_paths(" M", modified_paths, &worktree, writer)?;
+    print_paths(" M", modified_unstaged_paths, &worktree, writer)?;
     print_paths("M ", modified_staged_paths, &worktree, writer)?;
     print_paths(" D", deleted_unstaged_paths, &worktree, writer)?;
     print_paths("D ", deleted_staged_paths, &worktree, writer)?;
@@ -38,19 +38,6 @@ pub fn status(repository: &Repository, writer: &mut dyn OutputWriter) -> io::Res
     print_paths("??", untracked_paths, &worktree, writer)?;
 
     Ok(())
-}
-
-fn resolve_deleted_staged_paths(
-    path_to_committed_id: &HashMap<PathBuf, String>,
-    worktree_root: &Path,
-    index: &Index,
-) -> Vec<PathBuf> {
-    path_to_committed_id
-        .keys()
-        .cloned()
-        .filter(|path| !index.has_entry(path))
-        .map(|path| worktree_root.join(path))
-        .collect()
 }
 
 fn print_paths(
@@ -122,7 +109,7 @@ fn resolve_untracked_paths(
     file::resolve_paths(worktree.root(), untracked_paths_filter)
 }
 
-fn resolve_staged_paths(
+fn resolve_modified_and_created_staged_paths(
     path_to_committed_id: &HashMap<PathBuf, String>,
     repository: &Repository,
     index: &Index,
@@ -150,6 +137,27 @@ fn resolve_staged_paths(
         repository,
         index,
     )
+}
+
+fn resolve_deleted_staged_paths(
+    path_to_committed_id: &HashMap<PathBuf, String>,
+    worktree_root: &Path,
+    index: &Index,
+) -> Vec<PathBuf> {
+    path_to_committed_id
+        .keys()
+        .cloned()
+        .filter(|path| !index.has_entry(path))
+        .map(|path| worktree_root.join(path))
+        .collect()
+}
+
+fn resolve_deleted_unstaged_paths(tracked_paths: &[PathBuf]) -> Vec<PathBuf> {
+    tracked_paths
+        .iter()
+        .filter(|path| !path.exists())
+        .map(|path| path.to_owned())
+        .collect()
 }
 
 fn resolve_committed_paths_and_ids(
@@ -206,7 +214,7 @@ fn split_staged_paths_into_modified_and_created(
     Ok((modified_paths, created_paths))
 }
 
-fn get_modified_paths(
+fn resolve_modified_unstaged_paths(
     tracked_paths: &[PathBuf],
     worktree: &Worktree,
     index: &Index,
