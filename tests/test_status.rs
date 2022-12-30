@@ -156,3 +156,25 @@ fn test_shows_newly_created_file_in_subdirectory() -> io::Result<()> {
 
     Ok(())
 }
+
+#[test]
+fn test_shows_deleted_unstaged_file() -> io::Result<()> {
+    // arrange
+    let workdir = rut_testhelpers::create_temporary_directory();
+    let repository = Repository::from_worktree_root(&workdir);
+    rut_testhelpers::rut_init(&repository);
+
+    let file = workdir.join("file.txt");
+    fs::write(&file, "content")?;
+    rut_testhelpers::rut_add(&file, &repository);
+    rut_testhelpers::rut_commit("First commit", &repository)?;
+    fs::remove_file(&file)?;
+
+    // act
+    let output = rut_testhelpers::rut_status(&repository)?;
+
+    // assert
+    assert_eq!(output, " D file.txt\n");
+
+    Ok(())
+}

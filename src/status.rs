@@ -18,6 +18,11 @@ pub fn status(repository: &Repository, writer: &mut dyn OutputWriter) -> io::Res
 
     let tracked_paths = resolve_tracked_paths(&worktree, &unlocked_index);
     let modified_paths = get_modified_paths(&tracked_paths, &worktree, &unlocked_index);
+    let unstaged_deleted_paths = tracked_paths
+        .iter()
+        .filter(|path| !path.exists())
+        .map(|path| path.to_owned())
+        .collect();
     let untracked_paths = resolve_untracked_paths(&worktree, &unlocked_index);
     let (modified_staged_paths, created_staged_paths) =
         resolve_staged_paths(&repository, &unlocked_index)?;
@@ -25,6 +30,7 @@ pub fn status(repository: &Repository, writer: &mut dyn OutputWriter) -> io::Res
     print_paths(modified_paths, " M", &worktree, writer)?;
     print_paths(modified_staged_paths, "M ", &worktree, writer)?;
     print_paths(created_staged_paths, "A ", &worktree, writer)?;
+    print_paths(unstaged_deleted_paths, " D", &worktree, writer)?;
     print_paths(untracked_paths, "??", &worktree, writer)?;
 
     Ok(())
@@ -53,7 +59,11 @@ fn print_paths(
 
 fn resolve_tracked_paths(worktree: &Worktree, index: &Index) -> Vec<PathBuf> {
     let root = worktree.root();
-    index.get_entries().iter().map(|entry| root.join(&entry.path)).collect()
+    index
+        .get_entries()
+        .iter()
+        .map(|entry| root.join(&entry.path))
+        .collect()
 }
 
 fn resolve_untracked_paths(worktree: &Worktree, index: &Index) -> Vec<PathBuf> {
