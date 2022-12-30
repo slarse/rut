@@ -8,6 +8,7 @@ use walkdir::DirEntry;
 use crate::file;
 use crate::hex;
 use crate::index::Index;
+use crate::objects::{Blob, GitObject};
 use crate::output::OutputWriter;
 use crate::refs::RefHandler;
 use crate::workspace::{Repository, Worktree};
@@ -19,7 +20,7 @@ pub fn status(repository: &Repository, writer: &mut dyn OutputWriter) -> io::Res
 
     let tracked_paths = resolve_tracked_paths(&path_to_committed_id, &worktree, &unlocked_index);
     let modified_unstaged_paths =
-        resolve_modified_unstaged_paths(&tracked_paths, &worktree, &unlocked_index);
+        resolve_modified_unstaged_paths(&tracked_paths, &repository, &unlocked_index);
     let deleted_unstaged_paths = resolve_deleted_unstaged_paths(&tracked_paths);
     let untracked_paths = resolve_untracked_paths(&tracked_paths, &worktree, &unlocked_index);
     let (modified_staged_paths, created_staged_paths) = resolve_modified_and_created_staged_paths(
@@ -216,9 +217,10 @@ fn split_staged_paths_into_modified_and_created(
 
 fn resolve_modified_unstaged_paths(
     tracked_paths: &[PathBuf],
-    worktree: &Worktree,
+    repository: &Repository,
     index: &Index,
 ) -> Vec<PathBuf> {
+    let worktree = repository.worktree();
     tracked_paths
         .into_iter()
         .filter(|path| {
@@ -232,11 +234,19 @@ fn resolve_modified_unstaged_paths(
 
 fn is_modified(absolute_path: &Path, tracked_path: &Path, index: &Index) -> io::Result<bool> {
     let is_modified = if let Some(index_entry) = index.get(tracked_path) {
+        let indexed_object_id = &index_entry.object_id;
         let metadata = fs::metadata(absolute_path)?;
-        index_entry.mtime_seconds != metadata.st_mtime() as u32
-            || index_entry.mtime_nanoseconds != metadata.st_mtime_nsec() as u32
+        (index_entry.mtime_seconds != metadata.st_mtime() as u32
+            || index_entry.mtime_nanoseconds != metadata.st_mtime_nsec() as u32)
+            && *indexed_object_id != hash_as_blob(absolute_path)?
     } else {
         false
     };
     Ok(is_modified)
+}
+
+fn hash_as_blob(absolute_path: &Path) -> io::Result<Vec<u8>> {
+    let content = file::read_file(absolute_path)?;
+    let blob = Blob::new(content);
+    Ok(blob.id())
 }
