@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::os::linux::fs::MetadataExt;
 use std::path::{Path, PathBuf};
 use std::{fs, io};
@@ -15,25 +15,42 @@ use crate::workspace::{Repository, Worktree};
 pub fn status(repository: &Repository, writer: &mut dyn OutputWriter) -> io::Result<()> {
     let worktree = repository.worktree();
     let unlocked_index = repository.load_index_unlocked()?;
+    let path_to_committed_id = resolve_committed_paths_and_ids(&repository)?;
 
-    let tracked_paths = resolve_tracked_paths(&worktree, &unlocked_index);
+    let tracked_paths = resolve_tracked_paths(&path_to_committed_id, &worktree, &unlocked_index);
     let modified_paths = get_modified_paths(&tracked_paths, &worktree, &unlocked_index);
-    let unstaged_deleted_paths = tracked_paths
+    let deleted_unstaged_paths = tracked_paths
         .iter()
         .filter(|path| !path.exists())
         .map(|path| path.to_owned())
         .collect();
-    let untracked_paths = resolve_untracked_paths(&worktree, &unlocked_index);
+    let untracked_paths = resolve_untracked_paths(&tracked_paths, &worktree, &unlocked_index);
     let (modified_staged_paths, created_staged_paths) =
-        resolve_staged_paths(&repository, &unlocked_index)?;
+        resolve_staged_paths(&path_to_committed_id, &repository, &unlocked_index)?;
+    let deleted_staged_paths =
+        resolve_deleted_staged_paths(&path_to_committed_id, &worktree.root(), &unlocked_index);
 
     print_paths(modified_paths, " M", &worktree, writer)?;
     print_paths(modified_staged_paths, "M ", &worktree, writer)?;
     print_paths(created_staged_paths, "A ", &worktree, writer)?;
-    print_paths(unstaged_deleted_paths, " D", &worktree, writer)?;
+    print_paths(deleted_staged_paths, "D ", &worktree, writer)?;
+    print_paths(deleted_unstaged_paths, " D", &worktree, writer)?;
     print_paths(untracked_paths, "??", &worktree, writer)?;
 
     Ok(())
+}
+
+fn resolve_deleted_staged_paths(
+    path_to_committed_id: &HashMap<PathBuf, String>,
+    worktree_root: &Path,
+    index: &Index,
+) -> Vec<PathBuf> {
+    path_to_committed_id
+        .keys()
+        .cloned()
+        .filter(|path| !index.has_entry(path))
+        .map(|path| worktree_root.join(path))
+        .collect()
 }
 
 fn print_paths(
@@ -57,16 +74,34 @@ fn print_paths(
     Ok(())
 }
 
-fn resolve_tracked_paths(worktree: &Worktree, index: &Index) -> Vec<PathBuf> {
+fn resolve_tracked_paths(
+    path_to_committed_id: &HashMap<PathBuf, String>,
+    worktree: &Worktree,
+    index: &Index,
+) -> Vec<PathBuf> {
     let root = worktree.root();
-    index
+
+    let mut paths = index
         .get_entries()
         .iter()
         .map(|entry| root.join(&entry.path))
-        .collect()
+        .collect::<HashSet<PathBuf>>();
+    let paths_in_last_commit = path_to_committed_id.keys().map(|path| root.join(path));
+
+    paths.extend(paths_in_last_commit);
+    paths.into_iter().collect()
 }
 
-fn resolve_untracked_paths(worktree: &Worktree, index: &Index) -> Vec<PathBuf> {
+fn resolve_untracked_paths(
+    tracked_paths: &[PathBuf],
+    worktree: &Worktree,
+    index: &Index,
+) -> Vec<PathBuf> {
+    let tracked_path_set = tracked_paths
+        .iter()
+        .map(|path| path.as_path())
+        .collect::<HashSet<_>>();
+
     let untracked_paths_filter = |entry: &DirEntry| {
         let relative_path = worktree.relativize_path(entry.path());
         let parent = relative_path.parent().unwrap();
@@ -77,7 +112,7 @@ fn resolve_untracked_paths(worktree: &Worktree, index: &Index) -> Vec<PathBuf> {
             if entry.path().is_dir() {
                 index.is_tracked_directory(relative_path)
             } else {
-                index.has_entry(relative_path)
+                tracked_path_set.contains(entry.path())
             }
         };
 
@@ -88,6 +123,7 @@ fn resolve_untracked_paths(worktree: &Worktree, index: &Index) -> Vec<PathBuf> {
 }
 
 fn resolve_staged_paths(
+    path_to_committed_id: &HashMap<PathBuf, String>,
     repository: &Repository,
     index: &Index,
 ) -> io::Result<(Vec<PathBuf>, Vec<PathBuf>)> {
@@ -108,10 +144,17 @@ fn resolve_staged_paths(
             .filter(|path| path.is_file())
             .collect();
 
-    split_staged_paths_into_modified_and_created(&staged_paths, repository, index)
+    split_staged_paths_into_modified_and_created(
+        &staged_paths,
+        path_to_committed_id,
+        repository,
+        index,
+    )
 }
 
-fn resolve_commited_paths_and_ids(repository: &Repository) -> io::Result<HashMap<PathBuf, String>> {
+fn resolve_committed_paths_and_ids(
+    repository: &Repository,
+) -> io::Result<HashMap<PathBuf, String>> {
     let head_commit_id_opt = RefHandler::new(&repository).head();
     if head_commit_id_opt.is_err() {
         return Ok(HashMap::new());
@@ -139,10 +182,10 @@ fn resolve_commited_paths_and_ids(repository: &Repository) -> io::Result<HashMap
 
 fn split_staged_paths_into_modified_and_created(
     staged_paths: &[PathBuf],
+    path_to_committed_id: &HashMap<PathBuf, String>,
     repository: &Repository,
     index: &Index,
 ) -> io::Result<(Vec<PathBuf>, Vec<PathBuf>)> {
-    let path_to_committed_id = resolve_commited_paths_and_ids(&repository)?;
     let mut modified_paths = vec![];
     let mut created_paths = vec![];
 
