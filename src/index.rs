@@ -246,6 +246,10 @@ impl Index {
     pub fn get<P: AsRef<Path>>(&self, key: P) -> Option<&IndexEntry> {
         self.entries.get(key.as_ref())
     }
+
+    pub fn get_mut<P: AsRef<Path>>(&mut self, key: P) -> Option<&mut IndexEntry> {
+        self.entries.get_mut(key.as_ref())
+    }
 }
 
 impl AsVec<u8> for Index {

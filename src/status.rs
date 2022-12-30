@@ -15,21 +15,19 @@ use crate::workspace::{Repository, Worktree};
 
 pub fn status(repository: &Repository, writer: &mut dyn OutputWriter) -> io::Result<()> {
     let worktree = repository.worktree();
-    let unlocked_index = repository.load_index_unlocked()?;
+    let mut index_lockfile = repository.load_index()?;
+    let index = index_lockfile.as_mut();
     let path_to_committed_id = resolve_committed_paths_and_ids(&repository)?;
 
-    let tracked_paths = resolve_tracked_paths(&path_to_committed_id, &worktree, &unlocked_index);
+    let tracked_paths = resolve_tracked_paths(&path_to_committed_id, &worktree, index);
     let modified_unstaged_paths =
-        resolve_modified_unstaged_paths(&tracked_paths, &repository, &unlocked_index);
+        resolve_modified_unstaged_paths(&tracked_paths, &repository, index);
     let deleted_unstaged_paths = resolve_deleted_unstaged_paths(&tracked_paths);
-    let untracked_paths = resolve_untracked_paths(&tracked_paths, &worktree, &unlocked_index);
-    let (modified_staged_paths, created_staged_paths) = resolve_modified_and_created_staged_paths(
-        &path_to_committed_id,
-        &repository,
-        &unlocked_index,
-    )?;
+    let untracked_paths = resolve_untracked_paths(&tracked_paths, &worktree, index);
+    let (modified_staged_paths, created_staged_paths) =
+        resolve_modified_and_created_staged_paths(&path_to_committed_id, &repository, index)?;
     let deleted_staged_paths =
-        resolve_deleted_staged_paths(&path_to_committed_id, &worktree.root(), &unlocked_index);
+        resolve_deleted_staged_paths(&path_to_committed_id, &worktree.root(), index);
 
     print_paths(" M", modified_unstaged_paths, &worktree, writer)?;
     print_paths("M ", modified_staged_paths, &worktree, writer)?;
@@ -38,7 +36,7 @@ pub fn status(repository: &Repository, writer: &mut dyn OutputWriter) -> io::Res
     print_paths("A ", created_staged_paths, &worktree, writer)?;
     print_paths("??", untracked_paths, &worktree, writer)?;
 
-    Ok(())
+    index_lockfile.write()
 }
 
 fn print_paths(
@@ -218,13 +216,13 @@ fn split_staged_paths_into_modified_and_created(
 fn resolve_modified_unstaged_paths(
     tracked_paths: &[PathBuf],
     repository: &Repository,
-    index: &Index,
+    index: &mut Index,
 ) -> Vec<PathBuf> {
     let worktree = repository.worktree();
     tracked_paths
         .into_iter()
         .filter(|path| {
-            is_modified(&path, &worktree.relativize_path(&path), &index)
+            is_modified(&path, &worktree.relativize_path(&path), index)
                 .ok()
                 .unwrap_or(false)
         })
@@ -232,16 +230,34 @@ fn resolve_modified_unstaged_paths(
         .collect()
 }
 
-fn is_modified(absolute_path: &Path, tracked_path: &Path, index: &Index) -> io::Result<bool> {
-    let is_modified = if let Some(index_entry) = index.get(tracked_path) {
-        let indexed_object_id = &index_entry.object_id;
+/**
+ * Returns true if the file at the given path has been modified since the last commit.
+ *
+ * Side effect: Updates the index with new mtimes if they've been updatet without the content being
+ * changed.
+ */
+fn is_modified(absolute_path: &Path, tracked_path: &Path, index: &mut Index) -> io::Result<bool> {
+    let is_modified = if let Some(index_entry) = index.get_mut(tracked_path) {
         let metadata = fs::metadata(absolute_path)?;
-        (index_entry.mtime_seconds != metadata.st_mtime() as u32
-            || index_entry.mtime_nanoseconds != metadata.st_mtime_nsec() as u32)
-            && *indexed_object_id != hash_as_blob(absolute_path)?
+        let mtimes_differ = index_entry.mtime_seconds != metadata.st_mtime() as u32
+            || index_entry.mtime_nanoseconds != metadata.st_mtime_nsec() as u32;
+
+        if mtimes_differ {
+            let current_object_id = hash_as_blob(absolute_path)?;
+            if current_object_id != index_entry.object_id {
+                true
+            } else {
+                index_entry.mtime_seconds = metadata.st_mtime() as u32;
+                index_entry.mtime_nanoseconds = metadata.st_mtime_nsec() as u32;
+                false
+            }
+        } else {
+            false
+        }
     } else {
         false
     };
+
     Ok(is_modified)
 }
 

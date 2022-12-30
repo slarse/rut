@@ -55,13 +55,22 @@ fn test_status_does_not_show_unmodified_tracked_file_with_modified_mtime() -> io
     fs::write(&committed_file, "content")?;
     rut_testhelpers::rut_add(&committed_file, &repository);
     rut_testhelpers::rut_commit("Initial commit", &repository)?;
+
+    // write the file again to change the mtime (I couldn't find "touch" in the stdlib)
     fs::write(&committed_file, "content")?;
+
+    let index_before = repository.load_index_unlocked()?;
+    let index_entry_before_status = index_before.get("file.txt").unwrap();
 
     // act
     let output = rut_testhelpers::rut_status(&repository)?;
 
     // assert
     assert_eq!(output, "");
+
+    let index_after = repository.load_index_unlocked()?;
+    let index_entry_after_status = index_after.get("file.txt").unwrap();
+    assert_ne!(index_entry_before_status, index_entry_after_status);
 
     Ok(())
 }
