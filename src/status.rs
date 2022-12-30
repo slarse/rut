@@ -30,12 +30,12 @@ pub fn status(repository: &Repository, writer: &mut dyn OutputWriter) -> io::Res
     let deleted_staged_paths =
         resolve_deleted_staged_paths(&path_to_committed_id, &worktree.root(), &unlocked_index);
 
-    print_paths(modified_paths, " M", &worktree, writer)?;
-    print_paths(modified_staged_paths, "M ", &worktree, writer)?;
-    print_paths(created_staged_paths, "A ", &worktree, writer)?;
-    print_paths(deleted_staged_paths, "D ", &worktree, writer)?;
-    print_paths(deleted_unstaged_paths, " D", &worktree, writer)?;
-    print_paths(untracked_paths, "??", &worktree, writer)?;
+    print_paths(" M", modified_paths, &worktree, writer)?;
+    print_paths("M ", modified_staged_paths, &worktree, writer)?;
+    print_paths(" D", deleted_unstaged_paths, &worktree, writer)?;
+    print_paths("D ", deleted_staged_paths, &worktree, writer)?;
+    print_paths("A ", created_staged_paths, &worktree, writer)?;
+    print_paths("??", untracked_paths, &worktree, writer)?;
 
     Ok(())
 }
@@ -54,8 +54,8 @@ fn resolve_deleted_staged_paths(
 }
 
 fn print_paths(
-    mut paths: Vec<PathBuf>,
     prefix: &str,
+    mut paths: Vec<PathBuf>,
     worktree: &Worktree,
     writer: &mut dyn OutputWriter,
 ) -> io::Result<()> {
