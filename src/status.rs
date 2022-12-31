@@ -29,24 +29,25 @@ pub fn status(repository: &Repository, writer: &mut dyn OutputWriter) -> io::Res
     let deleted_staged_paths =
         resolve_deleted_staged_paths(&path_to_committed_id, &worktree.root(), index);
 
-    print_paths(" M", modified_unstaged_paths, &worktree, writer)?;
-    print_paths("M ", modified_staged_paths, &worktree, writer)?;
-    print_paths(" D", deleted_unstaged_paths, &worktree, writer)?;
-    print_paths("D ", deleted_staged_paths, &worktree, writer)?;
-    print_paths("A ", created_staged_paths, &worktree, writer)?;
-    print_paths("??", untracked_paths, &worktree, writer)?;
+    print_paths(" M", &modified_unstaged_paths, &worktree, writer)?;
+    print_paths("M ", &modified_staged_paths, &worktree, writer)?;
+    print_paths(" D", &deleted_unstaged_paths, &worktree, writer)?;
+    print_paths("D ", &deleted_staged_paths, &worktree, writer)?;
+    print_paths("A ", &created_staged_paths, &worktree, writer)?;
+    print_paths("??", &untracked_paths, &worktree, writer)?;
 
     index_lockfile.write()
 }
 
 fn print_paths(
     prefix: &str,
-    mut paths: Vec<PathBuf>,
+    paths: &[PathBuf],
     worktree: &Worktree,
     writer: &mut dyn OutputWriter,
 ) -> io::Result<()> {
-    paths.sort_by(|lhs, rhs| lhs.cmp(rhs));
-    for path in paths {
+    let mut sorted_paths = paths.iter().collect::<Vec<&PathBuf>>();
+    sorted_paths.sort();
+    for path in sorted_paths {
         let relative_path = worktree.relativize_path(&path);
         let suffix = if path.is_dir() { "/" } else { "" };
         let line = format!(
