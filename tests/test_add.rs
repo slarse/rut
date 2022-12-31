@@ -2,7 +2,7 @@ use std::{fs, io, path::PathBuf};
 
 use rut::{add, index::Index, workspace::Repository};
 
-use rut_testhelpers::{create_temporary_directory, rut_add, rut_init};
+use rut_testhelpers::{create_temporary_directory, rut_add, rut_commit, rut_init};
 
 #[test]
 fn test_add_directory() -> io::Result<()> {
@@ -73,6 +73,34 @@ fn test_adding_file_when_index_is_locked() -> io::Result<()> {
             assert_eq!(message, expected_message);
         }
     }
+
+    Ok(())
+}
+
+#[test]
+fn test_add_removed_file() -> io::Result<()> {
+    // arrange
+    let workdir = create_temporary_directory();
+    let readme = workdir.join("README.md");
+
+    fs::write(&readme, "A README")?;
+
+    let repository = Repository::from_worktree_root(workdir);
+    rut_init(&repository);
+    rut_add(&readme, &repository);
+    rut_commit("Initial commit", &repository)?;
+
+    fs::remove_file(&readme)?;
+
+    // act
+    add::add(&readme, &repository)?;
+
+    // assert
+    let index = repository.load_index_unlocked()?;
+    let readme_relative_path = repository.worktree().relativize_path(&readme);
+    let readme_entry = index.get(&readme_relative_path);
+
+    assert!(readme_entry.is_none());
 
     Ok(())
 }

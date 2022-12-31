@@ -17,8 +17,14 @@ pub fn add<P: AsRef<Path>>(path: P, repository: &Repository) -> io::Result<()> {
     let absolute_path = repository.worktree().root().join(&path);
     let mut index = repository.load_index()?;
 
-    for path in file::resolve_files(&absolute_path) {
-        add_file(&path, index.as_mut(), &repository)?;
+    // if the absolute_path does not exist, remove it from the index, otherwhise add it
+    if absolute_path.exists() {
+        for path in file::resolve_files(&absolute_path) {
+            add_file(&path, index.as_mut(), &repository)?;
+        }
+    } else {
+        let relative_path = repository.worktree().relativize_path(&absolute_path);
+        index.as_mut().remove(&relative_path);
     }
 
     index.write()
