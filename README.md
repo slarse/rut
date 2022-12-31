@@ -60,7 +60,9 @@ Rut currently supports the following subset of Git:
       `GIT_AUTHOR_EMAIL` environment variables
     - The commit message is taken from the `.git/COMMIT_EDITMSG` file
 * `status`
-    - Shows untracked files only
+    - Mostly up-to-par with `git status`
+    - Currently does not attempt to identify renamed files. This requires
+      diffing which is currently not implemented.
     - Uses the porcelain output formatting as that's a lot easier to do
 
 ## Upcoming features
