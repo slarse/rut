@@ -20,23 +20,72 @@ pub fn status(repository: &Repository, writer: &mut dyn OutputWriter) -> io::Res
     let path_to_committed_id = resolve_committed_paths_and_ids(&repository)?;
 
     let tracked_paths = resolve_tracked_paths(&path_to_committed_id, &worktree, index);
-    let modified_unstaged_paths =
-        resolve_modified_unstaged_paths(&tracked_paths, &repository, index);
-    let deleted_unstaged_paths = resolve_deleted_unstaged_paths(&tracked_paths);
-    let untracked_paths = resolve_untracked_paths(&tracked_paths, &worktree, index);
-    let (modified_staged_paths, created_staged_paths) =
-        resolve_modified_and_created_staged_paths(&path_to_committed_id, &repository, index)?;
-    let deleted_staged_paths =
-        resolve_deleted_staged_paths(&path_to_committed_id, &worktree.root(), index);
+    let untracked_paths = resolve_untracked(&tracked_paths, &worktree, index);
 
-    print_paths(" M", &modified_unstaged_paths, &worktree, writer)?;
-    print_paths("M ", &modified_staged_paths, &worktree, writer)?;
-    print_paths(" D", &deleted_unstaged_paths, &worktree, writer)?;
-    print_paths("D ", &deleted_staged_paths, &worktree, writer)?;
-    print_paths("A ", &created_staged_paths, &worktree, writer)?;
+    let mut changes = vec![]
+        .into_iter()
+        .chain(resolve_unstaged_changes(&tracked_paths, &repository, index))
+        .chain(resolve_staged_changes(
+            &path_to_committed_id,
+            &repository,
+            index,
+        )?)
+        .collect::<Vec<_>>();
+
+    print_porcelain_format(&mut changes, writer)?;
+
     print_paths("??", &untracked_paths, &worktree, writer)?;
 
     index_lockfile.write()
+}
+
+struct Change {
+    path: PathBuf,
+    change_type: ChangeType,
+    changed_in: ChangePlace,
+}
+
+impl Change {
+    fn porcelain_format(&self) -> String {
+        let character = self.change_type.to_char();
+        let modification_shorthand = match self.changed_in {
+            ChangePlace::Index => format!("{} ", character),
+            ChangePlace::Worktree => format!(" {}", character),
+        };
+        format!("{} {}", modification_shorthand, self.path.display())
+    }
+}
+
+enum ChangePlace {
+    Worktree,
+    Index,
+}
+
+enum ChangeType {
+    Modified,
+    Deleted,
+    Created,
+}
+
+impl ChangeType {
+    fn to_char(&self) -> char {
+        match self {
+            ChangeType::Modified => 'M',
+            ChangeType::Deleted => 'D',
+            ChangeType::Created => 'A',
+        }
+    }
+}
+
+fn print_porcelain_format(
+    changes: &mut Vec<Change>,
+    writer: &mut dyn OutputWriter,
+) -> io::Result<()> {
+    changes.sort_by(|lhs, rhs| lhs.path.cmp(&rhs.path));
+    for change in changes {
+        writer.write(change.porcelain_format())?;
+    }
+    Ok(())
 }
 
 fn print_paths(
@@ -79,7 +128,7 @@ fn resolve_tracked_paths(
     paths.into_iter().collect()
 }
 
-fn resolve_untracked_paths(
+fn resolve_untracked(
     tracked_paths: &[PathBuf],
     worktree: &Worktree,
     index: &Index,
@@ -109,11 +158,25 @@ fn resolve_untracked_paths(
     file::resolve_paths(worktree.root(), untracked_paths_filter)
 }
 
-fn resolve_modified_and_created_staged_paths(
+fn resolve_staged_changes(
+    path_to_committed_id: &HashMap<PathBuf, String>,
+    repository: &Repository,
+    index: &mut Index,
+) -> io::Result<Vec<Change>> {
+    let mut staged_changes = resolve_staged_modifications(path_to_committed_id, repository, index)?;
+    staged_changes.extend(resolve_staged_deletions(
+        path_to_committed_id,
+        repository.worktree(),
+        index,
+    ));
+    Ok(staged_changes)
+}
+
+fn resolve_staged_modifications(
     path_to_committed_id: &HashMap<PathBuf, String>,
     repository: &Repository,
     index: &Index,
-) -> io::Result<(Vec<PathBuf>, Vec<PathBuf>)> {
+) -> io::Result<Vec<Change>> {
     let staged_paths_filter = |entry: &DirEntry| {
         if entry.path().is_dir() {
             return true;
@@ -131,33 +194,72 @@ fn resolve_modified_and_created_staged_paths(
             .filter(|path| path.is_file())
             .collect();
 
-    split_staged_paths_into_modified_and_created(
-        &staged_paths,
-        path_to_committed_id,
-        repository,
-        index,
-    )
+    classify_staged_changes(&staged_paths, path_to_committed_id, repository, index)
 }
 
-fn resolve_deleted_staged_paths(
+fn classify_staged_changes(
+    staged_paths: &[PathBuf],
     path_to_committed_id: &HashMap<PathBuf, String>,
-    worktree_root: &Path,
+    repository: &Repository,
     index: &Index,
-) -> Vec<PathBuf> {
+) -> io::Result<Vec<Change>> {
+    let mut changes = vec![];
+
+    for path in staged_paths {
+        let relative_path = repository.worktree().relativize_path(path);
+        match path_to_committed_id.get(&relative_path) {
+            Some(committed_object_id) => {
+                let indexed_object_id =
+                    hex::to_hex_string(&index.get(&relative_path).unwrap().object_id);
+                if *committed_object_id != indexed_object_id {
+                    changes.push(Change {
+                        path: relative_path.to_owned(),
+                        change_type: ChangeType::Modified,
+                        changed_in: ChangePlace::Index,
+                    });
+                }
+            }
+            None => changes.push(Change {
+                path: relative_path.to_owned(),
+                change_type: ChangeType::Created,
+                changed_in: ChangePlace::Index,
+            }),
+        }
+    }
+
+    Ok(changes)
+}
+
+fn resolve_staged_deletions(
+    path_to_committed_id: &HashMap<PathBuf, String>,
+    worktree: &Worktree,
+    index: &Index,
+) -> Vec<Change> {
     path_to_committed_id
         .keys()
         .cloned()
         .filter(|path| !index.has_entry(path))
-        .map(|path| worktree_root.join(path))
+        .map(|path| worktree.root().join(path))
+        .map(|path| Change {
+            path: worktree.relativize_path(&path),
+            change_type: ChangeType::Deleted,
+            changed_in: ChangePlace::Index,
+        })
         .collect()
 }
 
-fn resolve_deleted_unstaged_paths(tracked_paths: &[PathBuf]) -> Vec<PathBuf> {
+fn resolve_unstaged_deletions<'a>(
+    tracked_paths: &'a [PathBuf],
+    worktree: &'a Worktree,
+) -> impl Iterator<Item = Change> + 'a {
     tracked_paths
         .iter()
         .filter(|path| !path.exists())
-        .map(|path| path.to_owned())
-        .collect()
+        .map(|path| Change {
+            path: worktree.relativize_path(&path),
+            change_type: ChangeType::Deleted,
+            changed_in: ChangePlace::Worktree,
+        })
 }
 
 fn resolve_committed_paths_and_ids(
@@ -188,37 +290,24 @@ fn resolve_committed_paths_and_ids(
     Ok(path_to_id)
 }
 
-fn split_staged_paths_into_modified_and_created(
-    staged_paths: &[PathBuf],
-    path_to_committed_id: &HashMap<PathBuf, String>,
-    repository: &Repository,
-    index: &Index,
-) -> io::Result<(Vec<PathBuf>, Vec<PathBuf>)> {
-    let mut modified_paths = vec![];
-    let mut created_paths = vec![];
-
-    for path in staged_paths {
-        let relative_path = repository.worktree().relativize_path(path);
-        match path_to_committed_id.get(&relative_path) {
-            Some(committed_object_id) => {
-                let indexed_object_id =
-                    hex::to_hex_string(&index.get(&relative_path).unwrap().object_id);
-                if *committed_object_id != indexed_object_id {
-                    modified_paths.push(path.to_owned())
-                }
-            }
-            None => created_paths.push(path.to_owned()),
-        }
-    }
-
-    Ok((modified_paths, created_paths))
-}
-
-fn resolve_modified_unstaged_paths(
+fn resolve_unstaged_changes(
     tracked_paths: &[PathBuf],
     repository: &Repository,
     index: &mut Index,
-) -> Vec<PathBuf> {
+) -> Vec<Change> {
+    resolve_unstaged_modifications(tracked_paths, repository, index)
+        .chain(resolve_unstaged_deletions(
+            tracked_paths,
+            repository.worktree(),
+        ))
+        .collect()
+}
+
+fn resolve_unstaged_modifications<'a>(
+    tracked_paths: &'a [PathBuf],
+    repository: &'a Repository,
+    index: &'a mut Index,
+) -> impl Iterator<Item = Change> + 'a {
     let worktree = repository.worktree();
     tracked_paths
         .into_iter()
@@ -227,8 +316,11 @@ fn resolve_modified_unstaged_paths(
                 .ok()
                 .unwrap_or(false)
         })
-        .map(|path| path.to_owned())
-        .collect()
+        .map(|path| Change {
+            path: repository.worktree().relativize_path(&path),
+            change_type: ChangeType::Modified,
+            changed_in: ChangePlace::Worktree,
+        })
 }
 
 /**
