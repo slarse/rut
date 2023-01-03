@@ -63,7 +63,7 @@ Rut currently supports the following subset of Git:
     - Mostly up-to-par with `git status`
     - Currently does not attempt to identify renamed files. This requires
       diffing which is currently not implemented.
-    - Uses the porcelain output formatting as that's a lot easier to do
+    - Accepts the `--porcelain` flag to output in a format that is easier to parse
 
 ## Upcoming features
 

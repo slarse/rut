@@ -1,8 +1,7 @@
 use std::io::Error;
 
 use crate::output::OutputWriter;
-use crate::status;
-use crate::{add, commit, init, rm, workspace::Repository};
+use crate::{add, commit, init, rm, status, workspace::Repository};
 use std::env;
 use std::io;
 use std::path::PathBuf;
@@ -29,7 +28,14 @@ pub fn run_command(args: Vec<String>) -> io::Result<()> {
             rm::rm(resolve_path(path)?, &repository)?;
         }
         ["status"] => {
-            status::status(&repository, &mut writer)?;
+            let status_options = Default::default();
+            status::status(&repository, &status_options, &mut writer)?;
+        }
+        ["status", "--porcelain"] => {
+            let status_options = status::Options {
+                output_format: status::OutputFormat::Porcelain,
+            };
+            status::status(&repository, &status_options, &mut writer)?;
         }
         _ => panic!("unexpected command {:?}", sliced_args),
     };

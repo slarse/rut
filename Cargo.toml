@@ -9,6 +9,7 @@ edition = "2021"
 sha1 = "0.10"
 flate2 = "1.0"
 walkdir = "2"
+derive_builder = "0.12"
 
 [dev-dependencies]
 rut_testhelpers = { path = "libs/rut_testhelpers" }

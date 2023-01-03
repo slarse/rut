@@ -1,6 +1,6 @@
 use std::{fs, io};
 
-use rut::workspace::Repository;
+use rut::{status, workspace::Repository};
 
 use rut_testhelpers;
 
@@ -15,7 +15,7 @@ fn test_status_shows_untracked_file() -> io::Result<()> {
     fs::write(untracked_file, "content")?;
 
     // act
-    let output = rut_testhelpers::rut_status(&repository)?;
+    let output = rut_testhelpers::rut_status_porcelain(&repository)?;
 
     // assert
     assert_eq!(output, "?? file.txt\n");
@@ -36,7 +36,7 @@ fn test_status_does_not_show_unmodified_tracked_file() -> io::Result<()> {
     rut_testhelpers::rut_commit("Initial commit", &repository)?;
 
     // act
-    let output = rut_testhelpers::rut_status(&repository)?;
+    let output = rut_testhelpers::rut_status_porcelain(&repository)?;
 
     // assert
     assert_eq!(output, "");
@@ -63,7 +63,7 @@ fn test_status_does_not_show_unmodified_tracked_file_with_modified_mtime() -> io
     let index_entry_before_status = index_before.get("file.txt").unwrap();
 
     // act
-    let output = rut_testhelpers::rut_status(&repository)?;
+    let output = rut_testhelpers::rut_status_porcelain(&repository)?;
 
     // assert
     assert_eq!(output, "");
@@ -88,7 +88,7 @@ fn test_status_shows_entire_directory_as_untracked() -> io::Result<()> {
     fs::write(&untracked_file, "content")?;
 
     // act
-    let output = rut_testhelpers::rut_status(&repository)?;
+    let output = rut_testhelpers::rut_status_porcelain(&repository)?;
 
     // assert
     assert_eq!(output, "?? untracked/\n");
@@ -111,7 +111,7 @@ fn test_output_path_sorting() -> io::Result<()> {
     fs::write(&other_untracked_file, "content")?;
 
     // act
-    let output = rut_testhelpers::rut_status(&repository)?;
+    let output = rut_testhelpers::rut_status_porcelain(&repository)?;
 
     // assert
     assert_eq!(output, "?? dir/\n?? file.txt\n");
@@ -133,7 +133,7 @@ fn test_shows_modified_file() -> io::Result<()> {
     fs::write(&tracked_file, "CONTENT")?;
 
     // act
-    let output = rut_testhelpers::rut_status(&repository)?;
+    let output = rut_testhelpers::rut_status_porcelain(&repository)?;
 
     // assert
     assert_eq!(output, " M file.txt\n");
@@ -158,7 +158,7 @@ fn test_shows_modified_staged_file_in_subdirectory() -> io::Result<()> {
     rut_testhelpers::rut_add(&file, &repository);
 
     // act
-    let output = rut_testhelpers::rut_status(&repository)?;
+    let output = rut_testhelpers::rut_status_porcelain(&repository)?;
 
     // assert
     assert_eq!(output, "M  dir/file.txt\n");
@@ -180,7 +180,7 @@ fn test_shows_newly_created_file_in_subdirectory() -> io::Result<()> {
     rut_testhelpers::rut_add(&file, &repository);
 
     // act
-    let output = rut_testhelpers::rut_status(&repository)?;
+    let output = rut_testhelpers::rut_status_porcelain(&repository)?;
 
     // assert
     assert_eq!(output, "A  dir/file.txt\n");
@@ -202,7 +202,7 @@ fn test_shows_deleted_unstaged_file() -> io::Result<()> {
     fs::remove_file(&file)?;
 
     // act
-    let output = rut_testhelpers::rut_status(&repository)?;
+    let output = rut_testhelpers::rut_status_porcelain(&repository)?;
 
     // assert
     assert_eq!(output, " D file.txt\n");
@@ -224,10 +224,44 @@ fn test_shows_deleted_staged_file() -> io::Result<()> {
     rut_testhelpers::rut_rm(&file, &repository);
 
     // act
-    let output = rut_testhelpers::rut_status(&repository)?;
+    let output = rut_testhelpers::rut_status_porcelain(&repository)?;
 
     // assert
     assert_eq!(output, "D  file.txt\n");
+
+    Ok(())
+}
+
+#[test]
+fn test_human_readable_format() -> io::Result<()> {
+    // arrange
+    let workdir = rut_testhelpers::create_temporary_directory();
+    let repository = Repository::from_worktree_root(&workdir);
+    rut_testhelpers::rut_init(&repository);
+
+    let modified_file = workdir.join("modified.txt");
+    fs::write(&modified_file, "content")?;
+    rut_testhelpers::rut_add(&modified_file, &repository);
+    rut_testhelpers::rut_commit("First commit", &repository)?;
+    fs::write(&modified_file, "more content")?;
+
+    let staged_file = workdir.join("staged.txt");
+    fs::write(&staged_file, "content")?;
+    rut_testhelpers::rut_add(&staged_file, &repository);
+
+    let untracked_file = workdir.join("untracked.txt");
+    fs::write(&untracked_file, "content")?;
+
+    let options = status::OptionsBuilder::default()
+        .output_format(status::OutputFormat::HumanReadable)
+        .build()
+        .ok()
+        .unwrap();
+
+    // act
+    let output = rut_testhelpers::rut_status(&repository, &options)?;
+
+    assert_eq!(output, "Changes to be committed:\n\tnew file: staged.txt\n\nChanges not staged for commit:\n\tmodified: modified.txt\n\nUntracked files:\n\tuntracked.txt\n\n");
 
     Ok(())
 }

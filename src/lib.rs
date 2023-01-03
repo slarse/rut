@@ -1,3 +1,6 @@
+#[macro_use]
+extern crate derive_builder;
+
 pub mod cli;
 
 pub mod workspace;

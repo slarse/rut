@@ -13,7 +13,28 @@ use crate::output::OutputWriter;
 use crate::refs::RefHandler;
 use crate::workspace::{Repository, Worktree};
 
-pub fn status(repository: &Repository, writer: &mut dyn OutputWriter) -> io::Result<()> {
+#[derive(Default, Builder, Debug)]
+pub struct Options {
+    pub output_format: OutputFormat,
+}
+
+#[derive(Debug, Clone)]
+pub enum OutputFormat {
+    Porcelain,
+    HumanReadable,
+}
+
+impl Default for OutputFormat {
+    fn default() -> Self {
+        OutputFormat::HumanReadable
+    }
+}
+
+pub fn status(
+    repository: &Repository,
+    options: &Options,
+    writer: &mut dyn OutputWriter,
+) -> io::Result<()> {
     let worktree = repository.worktree();
     let mut index_lockfile = repository.load_index()?;
     let index = index_lockfile.as_mut();
@@ -22,19 +43,27 @@ pub fn status(repository: &Repository, writer: &mut dyn OutputWriter) -> io::Res
     let tracked_paths = resolve_tracked_paths(&path_to_committed_id, &worktree, index);
     let untracked_paths = resolve_untracked(&tracked_paths, &worktree, index);
 
-    let mut changes = vec![]
-        .into_iter()
-        .chain(resolve_unstaged_changes(&tracked_paths, &repository, index))
-        .chain(resolve_staged_changes(
-            &path_to_committed_id,
-            &repository,
-            index,
-        )?)
-        .collect::<Vec<_>>();
+    let mut unstaged_changes = resolve_unstaged_changes(&tracked_paths, &repository, index);
+    let mut staged_changes = resolve_staged_changes(&path_to_committed_id, &repository, index)?;
 
-    print_porcelain_format(&mut changes, writer)?;
+    match options.output_format {
+        OutputFormat::HumanReadable => write_human_readable(
+            &mut staged_changes,
+            &mut unstaged_changes,
+            &untracked_paths,
+            &worktree,
+            writer,
+        )?,
+        OutputFormat::Porcelain => {
+            let mut all_changes = vec![]
+                .into_iter()
+                .chain(unstaged_changes)
+                .chain(staged_changes)
+                .collect::<Vec<_>>();
 
-    print_paths("??", &untracked_paths, &worktree, writer)?;
+            write_porcelain(&mut all_changes, &untracked_paths, &worktree, writer)?
+        }
+    }
 
     index_lockfile.write()
 }
@@ -53,6 +82,22 @@ impl Change {
             ChangePlace::Worktree => format!(" {}", character),
         };
         format!("{} {}", modification_shorthand, self.path.display())
+    }
+
+    fn human_readable_format(&self) -> String {
+        let modification_longform = match self.changed_in {
+            ChangePlace::Index => match self.change_type {
+                ChangeType::Modified => "modified",
+                ChangeType::Deleted => "deleted",
+                ChangeType::Created => "new file",
+            },
+            ChangePlace::Worktree => match self.change_type {
+                ChangeType::Modified => "modified",
+                ChangeType::Deleted => "deleted",
+                ChangeType::Created => panic!("This should not happen"),
+            },
+        };
+        format!("{}: {}", modification_longform, self.path.display())
     }
 }
 
@@ -77,14 +122,62 @@ impl ChangeType {
     }
 }
 
-fn print_porcelain_format(
+fn write_human_readable(
+    staged_changes: &mut Vec<Change>,
+    unstaged_changes: &mut Vec<Change>,
+    untracked_paths: &[PathBuf],
+    worktree: &Worktree,
+    writer: &mut dyn OutputWriter,
+) -> io::Result<()> {
+    staged_changes.sort_by(|lhs, rhs| lhs.path.cmp(&rhs.path));
+    unstaged_changes.sort_by(|lhs, rhs| lhs.path.cmp(&rhs.path));
+
+    let mut written = false;
+    if !staged_changes.is_empty() {
+        writer.write("Changes to be committed:".to_string())?;
+        for change in staged_changes {
+            writer.write(format!("\t{}", change.human_readable_format()))?;
+        }
+
+        written = true;
+    }
+
+    if !unstaged_changes.is_empty() {
+        if written {
+            writer.write("".to_string())?;
+        }
+
+        writer.write("Changes not staged for commit:".to_string())?;
+        for change in unstaged_changes {
+            writer.write(format!("\t{}", change.human_readable_format()))?;
+        }
+
+        written = true;
+    }
+
+    if !untracked_paths.is_empty() {
+        if written {
+            writer.write("".to_string())?;
+        }
+
+        writer.write("Untracked files:".to_string())?;
+        print_paths("\t", untracked_paths, worktree, writer)?;
+    }
+
+    writer.write("".to_string())
+}
+
+fn write_porcelain(
     changes: &mut Vec<Change>,
+    untracked_paths: &[PathBuf],
+    worktree: &Worktree,
     writer: &mut dyn OutputWriter,
 ) -> io::Result<()> {
     changes.sort_by(|lhs, rhs| lhs.path.cmp(&rhs.path));
     for change in changes {
         writer.write(change.porcelain_format())?;
     }
+    print_paths("?? ", &untracked_paths, &worktree, writer)?;
     Ok(())
 }
 
@@ -100,7 +193,7 @@ fn print_paths(
         let relative_path = worktree.relativize_path(&path);
         let suffix = if path.is_dir() { "/" } else { "" };
         let line = format!(
-            "{} {}{}",
+            "{}{}{}",
             prefix,
             relative_path.as_os_str().to_str().unwrap(),
             suffix

@@ -9,7 +9,12 @@ use std::{
     str,
 };
 
-use rut::{add, commit, init, status, output::OutputWriter, rm, workspace::Repository};
+use rut::{
+    add, commit, init,
+    output::OutputWriter,
+    rm, status,
+    workspace::Repository,
+};
 
 pub fn rut_commit_with_output_capture(
     commit_message: &str,
@@ -87,9 +92,24 @@ pub fn rut_init(repository: &Repository) {
     init::init(repository.git_dir(), &mut NoopOutputWriter).expect("Failed to initialize repo");
 }
 
-pub fn rut_status(repository: &Repository) -> io::Result<String> {
-    let mut output_writer = CapturingOutputWriter { output: String::new() };
-    status::status(repository, &mut output_writer)?;
+pub fn rut_status_porcelain(repository: &Repository) -> io::Result<String> {
+    let mut output_writer = CapturingOutputWriter {
+        output: String::new(),
+    };
+    let options = status::OptionsBuilder::default()
+        .output_format(status::OutputFormat::Porcelain)
+        .build()
+        .ok()
+        .unwrap();
+    status::status(repository, &options, &mut output_writer)?;
+    Ok(output_writer.output)
+}
+
+pub fn rut_status(repository: &Repository, options: &status::Options) -> io::Result<String> {
+    let mut output_writer = CapturingOutputWriter {
+        output: String::new(),
+    };
+    status::status(repository, options, &mut output_writer)?;
     Ok(output_writer.output)
 }
 
