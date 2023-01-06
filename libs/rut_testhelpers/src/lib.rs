@@ -9,12 +9,7 @@ use std::{
     str,
 };
 
-use rut::{
-    add, commit, init,
-    output::OutputWriter,
-    rm, status,
-    workspace::Repository,
-};
+use rut::{add, commit, init, output::OutputWriter, rm, status, workspace::Repository};
 
 pub fn rut_commit_with_output_capture(
     commit_message: &str,
@@ -120,6 +115,13 @@ pub fn assert_healthy_repo(git_dir: &PathBuf) {
         .output()
         .expect("Failed running 'git status'");
     assert_eq!(output.status.code().unwrap(), 0);
+}
+
+pub fn create_repository() -> Repository {
+    let workdir = create_temporary_directory();
+    let repository = Repository::from_worktree_root(workdir);
+    rut_init(&repository);
+    repository
 }
 
 pub fn create_temporary_directory() -> PathBuf {

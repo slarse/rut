@@ -1,15 +1,12 @@
 use std::{fs, io, path::PathBuf};
 
-use rut::{index::Index, workspace::Repository};
-
-use rut_testhelpers::{
-    assert_healthy_repo, create_temporary_directory, rut_add, rut_commit, rut_init, rut_rm,
-};
+use rut::index::Index;
 
 #[test]
 fn test_remove_file() -> io::Result<()> {
     // arrange
-    let workdir = create_temporary_directory();
+    let repository = rut_testhelpers::create_repository();
+    let workdir = repository.worktree().root();
 
     let readme = workdir.join("README.md");
     let file_txt = workdir.join("file.txt");
@@ -17,17 +14,14 @@ fn test_remove_file() -> io::Result<()> {
     fs::write(&readme, "A README.")?;
     fs::write(&file_txt, "A file.")?;
 
-    let repository = Repository::from_worktree_root(workdir);
-    rut_init(&repository);
-
-    rut_add(repository.worktree().root(), &repository);
-    rut_commit("Initial commit", &repository)?;
+    rut_testhelpers::rut_add(repository.worktree().root(), &repository);
+    rut_testhelpers::rut_commit("Initial commit", &repository)?;
 
     // act
-    rut_rm(&readme, &repository);
+    rut_testhelpers::rut_rm(&readme, &repository);
 
     // assert
-    assert_healthy_repo(&repository.git_dir());
+    rut_testhelpers::assert_healthy_repo(&repository.git_dir());
     let index = Index::from_file(&repository.index_file())?;
     let paths_in_index: Vec<&PathBuf> = index
         .get_entries()

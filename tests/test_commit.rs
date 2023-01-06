@@ -7,10 +7,7 @@ use rut_testhelpers;
 #[test]
 fn test_first_commit_denoted_as_root_commit_in_status_message() -> io::Result<()> {
     // arrange
-    let workdir = rut_testhelpers::create_temporary_directory();
-
-    let repository = Repository::from_worktree_root(workdir);
-    rut_testhelpers::rut_init(&repository);
+    let repository = rut_testhelpers::create_repository();
 
     // act
     let first_commit_output =
@@ -27,9 +24,10 @@ fn test_first_commit_denoted_as_root_commit_in_status_message() -> io::Result<()
 #[test]
 fn test_creating_commit_with_nested_directory() -> io::Result<()> {
     // arrange
-    let expected_root_tree_id = "e7c2decd32b47cb6f7204971ea9cbbb629bfa35c";
+    let repository = rut_testhelpers::create_repository();
+    let workdir = repository.worktree().root();
 
-    let workdir = rut_testhelpers::create_temporary_directory();
+    let expected_root_tree_id = "e7c2decd32b47cb6f7204971ea9cbbb629bfa35c";
 
     let readme = workdir.join("README.md");
     let nested_dir = workdir.join("nested");
@@ -40,9 +38,6 @@ fn test_creating_commit_with_nested_directory() -> io::Result<()> {
     fs::write(&file_in_nested_dir, "A file.")?;
 
     // act
-    let repository = Repository::from_worktree_root(workdir);
-    rut_testhelpers::rut_init(&repository);
-
     rut_testhelpers::rut_add(&readme, &repository);
     rut_testhelpers::rut_add(&file_in_nested_dir, &repository);
 
@@ -62,14 +57,12 @@ fn test_creating_commit_with_nested_directory() -> io::Result<()> {
 #[test]
 fn test_second_commit_gets_proper_parent() -> io::Result<()> {
     // arrange
-    let workdir = rut_testhelpers::create_temporary_directory();
-    let readme = workdir.join("README.md");
+    let repository = rut_testhelpers::create_repository();
+
+    let readme = repository.worktree().root().join("README.md");
     fs::write(&readme, "First commit content")?;
 
     // act
-    let repository = Repository::from_worktree_root(workdir);
-    rut_testhelpers::rut_init(&repository);
-
     rut_testhelpers::rut_add(&readme, &repository);
 
     let first_commit_sha = rut_testhelpers::rut_commit("First commit", &repository)?;

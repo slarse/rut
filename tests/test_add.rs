@@ -1,13 +1,14 @@
 use std::{fs, io, path::PathBuf};
 
-use rut::{add, index::Index, workspace::Repository};
+use rut::{add, index::Index};
 
-use rut_testhelpers::{create_temporary_directory, rut_add, rut_commit, rut_init};
+use rut_testhelpers;
 
 #[test]
 fn test_add_directory() -> io::Result<()> {
     // arrange
-    let workdir = create_temporary_directory();
+    let repository = rut_testhelpers::create_repository();
+    let workdir = repository.worktree().root();
 
     let readme = workdir.join("README.md");
     let nested_dir = workdir.join("nested");
@@ -18,10 +19,7 @@ fn test_add_directory() -> io::Result<()> {
     fs::write(&file_in_nested_dir, "A file.")?;
 
     // act
-    let repository = Repository::from_worktree_root(&workdir);
-    rut_init(&repository);
-
-    rut_add(&workdir, &repository);
+    rut_testhelpers::rut_add(&workdir, &repository);
 
     // assert
     let index = Index::from_file(&repository.git_dir().join("index"))?;
@@ -47,13 +45,11 @@ fn test_add_directory() -> io::Result<()> {
 #[test]
 fn test_adding_file_when_index_is_locked() -> io::Result<()> {
     // arrange
-    let workdir = create_temporary_directory();
-    let readme = workdir.join("README.md");
+    let repository = rut_testhelpers::create_repository();
 
+    let readme = repository.worktree().root().join("README.md");
     fs::write(&readme, "A README")?;
 
-    let repository = Repository::from_worktree_root(workdir);
-    rut_init(&repository);
     let index_lockfile = repository.git_dir().join("index.lock");
     fs::write(&index_lockfile, ";")?;
 
@@ -80,15 +76,13 @@ fn test_adding_file_when_index_is_locked() -> io::Result<()> {
 #[test]
 fn test_add_removed_file() -> io::Result<()> {
     // arrange
-    let workdir = create_temporary_directory();
-    let readme = workdir.join("README.md");
+    let repository = rut_testhelpers::create_repository();
 
+    let readme = repository.worktree().root().join("README.md");
     fs::write(&readme, "A README")?;
 
-    let repository = Repository::from_worktree_root(workdir);
-    rut_init(&repository);
-    rut_add(&readme, &repository);
-    rut_commit("Initial commit", &repository)?;
+    rut_testhelpers::rut_add(&readme, &repository);
+    rut_testhelpers::rut_commit("Initial commit", &repository)?;
 
     fs::remove_file(&readme)?;
 

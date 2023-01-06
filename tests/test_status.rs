@@ -1,17 +1,15 @@
 use std::{fs, io};
 
-use rut::{status, workspace::Repository};
+use rut::status;
 
 use rut_testhelpers;
 
 #[test]
 fn test_status_shows_untracked_file() -> io::Result<()> {
     // arrange
-    let workdir = rut_testhelpers::create_temporary_directory();
-    let repository = Repository::from_worktree_root(&workdir);
-    rut_testhelpers::rut_init(&repository);
+    let repository = rut_testhelpers::create_repository();
 
-    let untracked_file = workdir.join("file.txt");
+    let untracked_file = repository.worktree().root().join("file.txt");
     fs::write(untracked_file, "content")?;
 
     // act
@@ -26,11 +24,9 @@ fn test_status_shows_untracked_file() -> io::Result<()> {
 #[test]
 fn test_status_does_not_show_unmodified_tracked_file() -> io::Result<()> {
     // arrange
-    let workdir = rut_testhelpers::create_temporary_directory();
-    let repository = Repository::from_worktree_root(&workdir);
-    rut_testhelpers::rut_init(&repository);
+    let repository = rut_testhelpers::create_repository();
 
-    let committed_file = workdir.join("file.txt");
+    let committed_file = repository.worktree().root().join("file.txt");
     fs::write(&committed_file, "content")?;
     rut_testhelpers::rut_add(&committed_file, &repository);
     rut_testhelpers::rut_commit("Initial commit", &repository)?;
@@ -47,11 +43,9 @@ fn test_status_does_not_show_unmodified_tracked_file() -> io::Result<()> {
 #[test]
 fn test_status_does_not_show_unmodified_tracked_file_with_modified_mtime() -> io::Result<()> {
     // arrange
-    let workdir = rut_testhelpers::create_temporary_directory();
-    let repository = Repository::from_worktree_root(&workdir);
-    rut_testhelpers::rut_init(&repository);
+    let repository = rut_testhelpers::create_repository();
 
-    let committed_file = workdir.join("file.txt");
+    let committed_file = repository.worktree().root().join("file.txt");
     fs::write(&committed_file, "content")?;
     rut_testhelpers::rut_add(&committed_file, &repository);
     rut_testhelpers::rut_commit("Initial commit", &repository)?;
@@ -78,11 +72,9 @@ fn test_status_does_not_show_unmodified_tracked_file_with_modified_mtime() -> io
 #[test]
 fn test_status_shows_entire_directory_as_untracked() -> io::Result<()> {
     // arrange
-    let workdir = rut_testhelpers::create_temporary_directory();
-    let repository = Repository::from_worktree_root(&workdir);
-    rut_testhelpers::rut_init(&repository);
+    let repository = rut_testhelpers::create_repository();
 
-    let untracked_directory = workdir.join("untracked");
+    let untracked_directory = repository.worktree().root().join("untracked");
     let untracked_file = untracked_directory.join("file.txt");
     fs::create_dir(untracked_directory)?;
     fs::write(&untracked_file, "content")?;
@@ -99,9 +91,8 @@ fn test_status_shows_entire_directory_as_untracked() -> io::Result<()> {
 #[test]
 fn test_output_path_sorting() -> io::Result<()> {
     // arrange
-    let workdir = rut_testhelpers::create_temporary_directory();
-    let repository = Repository::from_worktree_root(&workdir);
-    rut_testhelpers::rut_init(&repository);
+    let repository = rut_testhelpers::create_repository();
+    let workdir = repository.worktree().root();
 
     let untracked_directory = workdir.join("dir");
     let untracked_file = untracked_directory.join("file.txt");
@@ -122,11 +113,9 @@ fn test_output_path_sorting() -> io::Result<()> {
 #[test]
 fn test_shows_modified_file() -> io::Result<()> {
     // arrange
-    let workdir = rut_testhelpers::create_temporary_directory();
-    let repository = Repository::from_worktree_root(&workdir);
-    rut_testhelpers::rut_init(&repository);
+    let repository = rut_testhelpers::create_repository();
 
-    let tracked_file = workdir.join("file.txt");
+    let tracked_file = repository.worktree().root().join("file.txt");
     fs::write(&tracked_file, "content")?;
     rut_testhelpers::rut_add(&tracked_file, &repository);
     rut_testhelpers::rut_commit("First commit", &repository)?;
@@ -144,11 +133,9 @@ fn test_shows_modified_file() -> io::Result<()> {
 #[test]
 fn test_shows_modified_staged_file_in_subdirectory() -> io::Result<()> {
     // arrange
-    let workdir = rut_testhelpers::create_temporary_directory();
-    let repository = Repository::from_worktree_root(&workdir);
-    rut_testhelpers::rut_init(&repository);
+    let repository = rut_testhelpers::create_repository();
 
-    let directory = workdir.join("dir");
+    let directory = repository.worktree().root().join("dir");
     fs::create_dir(&directory)?;
     let file = directory.join("file.txt");
     fs::write(&file, "content")?;
@@ -169,11 +156,9 @@ fn test_shows_modified_staged_file_in_subdirectory() -> io::Result<()> {
 #[test]
 fn test_shows_newly_created_file_in_subdirectory() -> io::Result<()> {
     // arrange
-    let workdir = rut_testhelpers::create_temporary_directory();
-    let repository = Repository::from_worktree_root(&workdir);
-    rut_testhelpers::rut_init(&repository);
+    let repository = rut_testhelpers::create_repository();
 
-    let directory = workdir.join("dir");
+    let directory = repository.worktree().root().join("dir");
     fs::create_dir(&directory)?;
     let file = directory.join("file.txt");
     fs::write(&file, "content")?;
@@ -191,11 +176,9 @@ fn test_shows_newly_created_file_in_subdirectory() -> io::Result<()> {
 #[test]
 fn test_shows_deleted_unstaged_file() -> io::Result<()> {
     // arrange
-    let workdir = rut_testhelpers::create_temporary_directory();
-    let repository = Repository::from_worktree_root(&workdir);
-    rut_testhelpers::rut_init(&repository);
+    let repository = rut_testhelpers::create_repository();
 
-    let file = workdir.join("file.txt");
+    let file = repository.worktree().root().join("file.txt");
     fs::write(&file, "content")?;
     rut_testhelpers::rut_add(&file, &repository);
     rut_testhelpers::rut_commit("First commit", &repository)?;
@@ -213,11 +196,9 @@ fn test_shows_deleted_unstaged_file() -> io::Result<()> {
 #[test]
 fn test_shows_deleted_staged_file() -> io::Result<()> {
     // arrange
-    let workdir = rut_testhelpers::create_temporary_directory();
-    let repository = Repository::from_worktree_root(&workdir);
-    rut_testhelpers::rut_init(&repository);
+    let repository = rut_testhelpers::create_repository();
 
-    let file = workdir.join("file.txt");
+    let file = repository.worktree().root().join("file.txt");
     fs::write(&file, "content")?;
     rut_testhelpers::rut_add(&file, &repository);
     rut_testhelpers::rut_commit("First commit", &repository)?;
@@ -235,9 +216,8 @@ fn test_shows_deleted_staged_file() -> io::Result<()> {
 #[test]
 fn test_human_readable_format() -> io::Result<()> {
     // arrange
-    let workdir = rut_testhelpers::create_temporary_directory();
-    let repository = Repository::from_worktree_root(&workdir);
-    rut_testhelpers::rut_init(&repository);
+    let repository = rut_testhelpers::create_repository();
+    let workdir = repository.worktree().root();
 
     let modified_file = workdir.join("modified.txt");
     fs::write(&modified_file, "content")?;
