@@ -1,6 +1,6 @@
 use std::io::Error;
 
-use crate::output::{OutputWriter, Color};
+use crate::output::{Color, OutputWriter};
 use crate::{add, commit, init, rm, status, workspace::Repository};
 use std::env;
 use std::io;

@@ -9,7 +9,7 @@ use crate::file;
 use crate::hex;
 use crate::index::Index;
 use crate::objects::{Blob, GitObject};
-use crate::output::{OutputWriter, Color};
+use crate::output::{Color, OutputWriter};
 use crate::refs::RefHandler;
 use crate::workspace::{Repository, Worktree};
 
