@@ -13,5 +13,6 @@ pub fn init<P: AsRef<Path>>(git_dir: P, writer: &mut dyn OutputWriter) -> io::Re
 
 fn write_init_message(git_dir: &Path, writer: &mut dyn OutputWriter) -> io::Result<()> {
     let message = format!("Initialized empty Rut repository in {:#?}", git_dir);
-    writer.write(message)
+    writer.write(message)?;
+    Ok(())
 }

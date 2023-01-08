@@ -1,6 +1,6 @@
 use std::io::Error;
 
-use crate::output::OutputWriter;
+use crate::output::{OutputWriter, Color};
 use crate::{add, commit, init, rm, status, workspace::Repository};
 use std::env;
 use std::io;
@@ -46,8 +46,23 @@ pub fn run_command(args: Vec<String>) -> io::Result<()> {
 pub struct StdoutWriter;
 
 impl OutputWriter for StdoutWriter {
-    fn write(&mut self, content: String) -> io::Result<()> {
-        Ok(println!("{}", content))
+    fn write(&mut self, content: String) -> io::Result<&mut dyn OutputWriter> {
+        println!("{}", content);
+        Ok(self)
+    }
+
+    fn set_color(&mut self, color: Color) -> io::Result<&mut dyn OutputWriter> {
+        let ansi_code = match color {
+            Color::Red => "31",
+            Color::Green => "32",
+        };
+        print!("\x1b[{}m", ansi_code);
+        Ok(self)
+    }
+
+    fn reset_formatting(&mut self) -> io::Result<&mut dyn OutputWriter> {
+        print!("\x1b[0m");
+        Ok(self)
     }
 }
 

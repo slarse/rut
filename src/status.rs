@@ -9,7 +9,7 @@ use crate::file;
 use crate::hex;
 use crate::index::Index;
 use crate::objects::{Blob, GitObject};
-use crate::output::OutputWriter;
+use crate::output::{OutputWriter, Color};
 use crate::refs::RefHandler;
 use crate::workspace::{Repository, Worktree};
 
@@ -135,9 +135,12 @@ fn write_human_readable(
     let mut written = false;
     if !staged_changes.is_empty() {
         writer.write("Changes to be committed:".to_string())?;
+
+        writer.set_color(Color::Green)?;
         for change in staged_changes {
             writer.write(format!("\t{}", change.human_readable_format()))?;
         }
+        writer.reset_formatting()?;
 
         written = true;
     }
@@ -148,9 +151,11 @@ fn write_human_readable(
         }
 
         writer.write("Changes not staged for commit:".to_string())?;
+        writer.set_color(Color::Red)?;
         for change in unstaged_changes {
             writer.write(format!("\t{}", change.human_readable_format()))?;
         }
+        writer.reset_formatting()?;
 
         written = true;
     }
@@ -161,10 +166,13 @@ fn write_human_readable(
         }
 
         writer.write("Untracked files:".to_string())?;
+        writer.set_color(Color::Red)?;
         print_paths("\t", untracked_paths, worktree, writer)?;
+        writer.reset_formatting()?;
     }
 
-    writer.write("".to_string())
+    writer.write("".to_string())?;
+    Ok(())
 }
 
 fn write_porcelain(

@@ -9,7 +9,7 @@ use std::{
     str,
 };
 
-use rut::{add, commit, init, output::OutputWriter, rm, status, workspace::Repository};
+use rut::{add, commit, init, output::{Color, OutputWriter}, rm, status, workspace::Repository};
 
 pub fn rut_commit_with_output_capture(
     commit_message: &str,
@@ -61,17 +61,34 @@ struct CapturingOutputWriter {
 }
 
 impl OutputWriter for CapturingOutputWriter {
-    fn write(&mut self, content: String) -> io::Result<()> {
+    fn write(&mut self, content: String) -> io::Result<&mut dyn OutputWriter> {
         let content_with_line_feed = content + "\n";
-        Ok(self.output.push_str(content_with_line_feed.as_str()))
+        self.output.push_str(content_with_line_feed.as_str());
+        Ok(self)
+    }
+
+    fn set_color(&mut self, _color: Color) -> io::Result<&mut dyn OutputWriter> {
+        Ok(self)
+    }
+
+    fn reset_formatting(&mut self) -> io::Result<&mut dyn OutputWriter> {
+        Ok(self)
     }
 }
 
 struct NoopOutputWriter;
 
 impl OutputWriter for NoopOutputWriter {
-    fn write(&mut self, _: String) -> io::Result<()> {
-        Ok(())
+    fn write(&mut self, _: String) -> io::Result<&mut dyn OutputWriter> {
+        Ok(self)
+    }
+
+    fn set_color(&mut self, _: Color) -> io::Result<&mut dyn OutputWriter> {
+        Ok(self)
+    }
+
+    fn reset_formatting(&mut self) -> io::Result<&mut dyn OutputWriter> {
+        Ok(self)
     }
 }
 

@@ -86,7 +86,8 @@ fn write_commit_status(commit: &Commit, writer: &mut dyn OutputWriter) -> io::Re
         to_hex_string(&commit.short_id()),
         first_line,
     );
-    writer.write(message)
+    writer.write(message)?;
+    Ok(())
 }
 
 fn build_tree(entries: &[&IndexEntry]) -> (Tree, Vec<Tree>) {
