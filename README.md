@@ -67,5 +67,4 @@ Rut currently supports the following subset of Git:
 
 ## Upcoming features
 
-I'm currently working on improving the `status` command to show more stuff than
-just untracked and modified files.
+I'm currently working on implementing `git diff`.
