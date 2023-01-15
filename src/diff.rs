@@ -1,4 +1,40 @@
-use std::fmt::Debug;
+use std::fmt::{Debug, Display};
+
+/**
+ * Computes a diff between two arbitrary sequences. The typical thing to use would be two lists of
+ * strings, where each element represents a line.
+ *
+ * ```
+ * use rut::diff;
+ *
+ * let a = "First line\nSecond line\nThird line".split('\n').collect::<Vec<&str>>();
+ * let b = "Second line\nThird line\nFourth line".split('\n').collect::<Vec<&str>>();
+ *
+ * let diff = diff::diff(&a, &b);
+ *
+ * assert_eq!(diff, "-First line\n Second line\n Third line\n+Fourth line\n");
+ * ```
+ */
+pub fn diff<S: Eq + Copy + Display>(a: &[S], b: &[S]) -> String {
+    let edit_script = edit_script(a, b);
+    let mut result = String::new();
+
+    for edit in edit_script {
+        match edit.kind {
+            EditKind::Equal => {
+                result.push_str(&format!(" {}", edit.s));
+            }
+            EditKind::Deletion => {
+                result.push_str(&format!("-{}", edit.s));
+            }
+            EditKind::Addition => {
+                result.push_str(&format!("+{}", edit.s));
+            }
+        }
+        result.push_str("\n");
+    }
+    result
+}
 
 /**
  * Computes an edit script between two arbitrary sequences.
