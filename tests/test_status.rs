@@ -245,3 +245,30 @@ fn test_human_readable_format() -> io::Result<()> {
 
     Ok(())
 }
+
+#[test]
+fn test_status_shows_untracked_file_in_tracked_directory() -> io::Result<()> {
+    // arrange
+    let repository = rut_testhelpers::create_repository();
+    let workdir = repository.worktree().root();
+
+    let tracked_directory = workdir.join("tracked");
+    let tracked_file = tracked_directory.join("file.txt");
+    fs::create_dir(&tracked_directory)?;
+    fs::write(&tracked_file, "content")?;
+    rut_testhelpers::rut_add(&tracked_directory, &repository);
+    rut_testhelpers::rut_commit("First commit", &repository)?;
+
+    let untracked_file = tracked_directory.join("untracked.txt");
+    fs::write(&untracked_file, "content")?;
+
+    println!("{:?}", repository.worktree().root());
+
+    // act
+    let output = rut_testhelpers::rut_status_porcelain(&repository)?;
+
+    // assert
+    assert_eq!(output, "?? tracked/untracked.txt\n");
+
+    Ok(())
+}

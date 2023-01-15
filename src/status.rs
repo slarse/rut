@@ -239,7 +239,24 @@ fn resolve_untracked(
         .map(|path| path.as_path())
         .collect::<HashSet<_>>();
 
-    let untracked_paths_filter = |entry: &DirEntry| {
+    let untracked_directories = file::resolve_paths(worktree.root(), |entry| {
+        if !entry.path().is_dir() {
+            return false;
+        }
+
+        let relative_path = worktree.relativize_path(entry.path());
+        let parent = relative_path.parent().unwrap();
+        let parent_is_tracked =
+            parent.to_str().unwrap() == "" || index.is_tracked_directory(parent);
+
+        parent_is_tracked && !index.is_tracked_directory(relative_path)
+    });
+
+    let untracked_files = file::resolve_paths(worktree.root(), |entry| {
+        if entry.path().is_dir() {
+            return true;
+        }
+
         let relative_path = worktree.relativize_path(entry.path());
         let parent = relative_path.parent().unwrap();
 
@@ -254,9 +271,15 @@ fn resolve_untracked(
         };
 
         parent_is_tracked && !is_path_tracked()
-    };
+    }).into_iter().filter(|path| !path.is_dir());
 
-    file::resolve_paths(worktree.root(), untracked_paths_filter)
+    let mut untracked_paths = untracked_directories
+        .into_iter()
+        .chain(untracked_files)
+        .collect::<Vec<_>>();
+    untracked_paths.sort();
+
+    untracked_paths
 }
 
 fn resolve_staged_changes(
