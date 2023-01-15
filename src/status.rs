@@ -42,7 +42,6 @@ pub fn status(
 
     let tracked_paths = resolve_tracked_paths(&path_to_committed_id, &worktree, index);
     let untracked_paths = resolve_untracked(&tracked_paths, &worktree, index);
-    println!("untracked_paths: {:?}", untracked_paths);
 
     let mut unstaged_changes = resolve_unstaged_changes(&tracked_paths, &repository, index);
     let mut staged_changes = resolve_staged_changes(&path_to_committed_id, &repository, index)?;
