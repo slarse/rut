@@ -61,10 +61,14 @@ Rut currently supports the following subset of Git:
     - The commit message is taken from the `.git/COMMIT_EDITMSG` file
 * `status`
     - Mostly up-to-par with `git status`
-    - Currently does not attempt to identify renamed files. This requires
-      diffing which is currently not implemented.
+    - Currently does not attempt to identify renamed files
     - Accepts the `--porcelain` flag to output in a format that is easier to parse
+* `diff`
+    - Can only compare the worktree to the index
+    - Currently prints out all lines after the first edit hunk as opposed to
+      just +/- 3 lines from any diff hunk
+    - Does not yet indicate where in the file revisions a diff hunk is located
 
 ## Upcoming features
 
-I'm currently working on implementing `git diff`.
+I'm working on improving the `diff` command.
