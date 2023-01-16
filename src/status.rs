@@ -68,6 +68,22 @@ pub fn status(
     index_lockfile.write()
 }
 
+pub fn resolve_files_with_unstaged_changes(
+    repository: &Repository,
+    index: &mut Index,
+) -> io::Result<Vec<PathBuf>> {
+    let path_to_committed_id = resolve_committed_paths_and_ids(&repository)?;
+
+    let worktree = repository.worktree();
+    let tracked_paths = resolve_tracked_paths(&path_to_committed_id, &worktree, index);
+
+    let unstaged_modifications = resolve_unstaged_modifications(&tracked_paths, &repository, index);
+    let paths_with_unstaged_changes =
+        unstaged_modifications.map(|change| worktree.root().join(change.path));
+
+    Ok(paths_with_unstaged_changes.collect())
+}
+
 struct Change {
     path: PathBuf,
     change_type: ChangeType,
@@ -271,7 +287,9 @@ fn resolve_untracked(
         };
 
         parent_is_tracked && !is_path_tracked()
-    }).into_iter().filter(|path| !path.is_dir());
+    })
+    .into_iter()
+    .filter(|path| !path.is_dir());
 
     let mut untracked_paths = untracked_directories
         .into_iter()

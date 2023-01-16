@@ -1,5 +1,6 @@
 use std::io::Error;
 
+use crate::diff;
 use crate::output::{Color, OutputWriter};
 use crate::{add, commit, init, rm, status, workspace::Repository};
 use std::env;
@@ -36,6 +37,9 @@ pub fn run_command(args: Vec<String>) -> io::Result<()> {
                 output_format: status::OutputFormat::Porcelain,
             };
             status::status(&repository, &status_options, &mut writer)?;
+        }
+        ["diff"] => {
+            diff::diff_repository(&repository, &mut writer)?;
         }
         _ => panic!("unexpected command {:?}", sliced_args),
     };

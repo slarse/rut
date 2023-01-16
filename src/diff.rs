@@ -1,4 +1,74 @@
-use std::fmt::{Debug, Display};
+use std::{
+    fmt::{Debug, Display},
+    fs, io,
+    path::Path,
+};
+
+use crate::{
+    index::Index,
+    output::{Color, OutputWriter},
+    status,
+    workspace::Repository,
+};
+
+pub fn diff_repository(repository: &Repository, writer: &mut dyn OutputWriter) -> io::Result<()> {
+    let mut index = repository.load_index()?;
+    let mut files_with_unstaged_changes =
+        status::resolve_files_with_unstaged_changes(&repository, &mut index.as_mut())?;
+    files_with_unstaged_changes.sort();
+
+    for file in files_with_unstaged_changes {
+        diff_file(&file, &index.as_mut(), repository, writer)?;
+    }
+
+    Ok(())
+}
+
+fn diff_file(
+    file: &Path,
+    index: &Index,
+    repository: &Repository,
+    writer: &mut dyn OutputWriter,
+) -> io::Result<()> {
+    let relative_path = repository.worktree().relativize_path(&file);
+    let a_index_entry = index.get(&relative_path).unwrap();
+    let a_raw = Vec::from(
+        repository
+            .database
+            .load_blob(&a_index_entry.object_id)
+            .unwrap()
+            .content(),
+    );
+
+    let a = String::from_utf8(a_raw).unwrap();
+    let b = fs::read_to_string(&file).unwrap();
+
+    let a_lines = a.split("\n").collect::<Vec<&str>>();
+    let b_lines = b.split("\n").collect::<Vec<&str>>();
+
+    writer.write(format!("--- a/{}", relative_path.display()))?;
+    writer.write(format!("+++ b/{}", relative_path.display()))?;
+    let edit_script = edit_script(&a_lines, &b_lines);
+    for edit in edit_script {
+        match edit.kind {
+            EditKind::Equal => {
+                writer.write(format!(" {}", edit.s))?;
+            }
+            EditKind::Deletion => {
+                writer.set_color(Color::Red)?;
+                writer.write(format!("-{}", edit.s))?;
+                writer.reset_formatting()?;
+            }
+            EditKind::Addition => {
+                writer.set_color(Color::Green)?;
+                writer.write(format!("+{}", edit.s))?;
+                writer.reset_formatting()?;
+            }
+        }
+    }
+
+    Ok(())
+}
 
 /**
  * Computes a diff between two arbitrary sequences. The typical thing to use would be two lists of

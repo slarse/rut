@@ -9,7 +9,12 @@ use std::{
     str,
 };
 
-use rut::{add, commit, init, output::{Color, OutputWriter}, rm, status, workspace::Repository};
+use rut::{
+    add, commit, diff, init,
+    output::{Color, OutputWriter},
+    rm, status,
+    workspace::Repository,
+};
 
 pub fn rut_commit_with_output_capture(
     commit_message: &str,
@@ -122,6 +127,14 @@ pub fn rut_status(repository: &Repository, options: &status::Options) -> io::Res
         output: String::new(),
     };
     status::status(repository, options, &mut output_writer)?;
+    Ok(output_writer.output)
+}
+
+pub fn rut_diff(repository: &Repository) -> io::Result<String> {
+    let mut output_writer = CapturingOutputWriter {
+        output: String::new(),
+    };
+    diff::diff_repository(repository, &mut output_writer)?;
     Ok(output_writer.output)
 }
 

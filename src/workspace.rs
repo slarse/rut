@@ -18,6 +18,7 @@ use crate::file::{LockFile, LockFileResource};
 use crate::hex;
 use crate::index::FileMode;
 use crate::index::Index;
+use crate::objects::Blob;
 use crate::objects::{Author, Commit, GitObject, Tree, TreeEntry};
 
 pub struct Database {
@@ -160,6 +161,11 @@ impl Database {
         let content = self.load_data(tree_id)?;
         let tree_entries = parse_tree_entries(&mut content.into_iter());
         Ok(Tree::new(tree_entries))
+    }
+
+    pub fn load_blob(&self, blob_id: &[u8]) -> io::Result<Blob> {
+        let content = self.load_data(blob_id)?;
+        Ok(Blob::with_hash(content, blob_id))
     }
 
     fn decompress<P: AsRef<Path>>(path: P) -> io::Result<Vec<u8>> {

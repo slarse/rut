@@ -33,6 +33,17 @@ impl Blob {
             id: id.to_vec(),
         }
     }
+
+    pub fn with_hash(bytes: Vec<u8>, id: &[u8]) -> Blob {
+        Blob {
+            bytes,
+            id: Vec::from(id),
+        }
+    }
+
+    pub fn content(&self) -> &[u8] {
+        &self.bytes
+    }
 }
 
 impl<'a> GitObject<'a> for Blob {
