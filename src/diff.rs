@@ -1,5 +1,6 @@
 use std::{
     fmt::{Debug, Display},
+    cmp,
     fs, io,
     path::Path,
 };
@@ -10,6 +11,8 @@ use crate::{
     status,
     workspace::Repository,
 };
+
+const MAX_DIFF_CONTEXT_LINES: usize = 3;
 
 pub fn diff_repository(repository: &Repository, writer: &mut dyn OutputWriter) -> io::Result<()> {
     let mut index = repository.load_index()?;
@@ -48,21 +51,52 @@ fn diff_file(
 
     writer.write(format!("--- a/{}", relative_path.display()))?;
     writer.write(format!("+++ b/{}", relative_path.display()))?;
+
     let edit_script = edit_script(&a_lines, &b_lines);
-    for edit in edit_script {
-        match edit.kind {
-            EditKind::Equal => {
+    let mut equals_head_size = 0;
+    let mut equals_tail_left_to_write = 0;
+
+    let write_head_context =
+        |i, equals_head_size, writer: &mut dyn OutputWriter| -> io::Result<()> {
+            let context_size = cmp::min(MAX_DIFF_CONTEXT_LINES, equals_head_size);
+            let equal_edits = &edit_script[i - context_size..i];
+
+            for edit in equal_edits {
                 writer.write(format!(" {}", edit.s))?;
             }
+
+            Ok(())
+        };
+
+    for (i, edit) in edit_script.iter().enumerate() {
+        match edit.kind {
+            EditKind::Equal => {
+                if equals_tail_left_to_write > 0 {
+                    writer.write(format!(" {}", edit.s))?;
+                    equals_tail_left_to_write -= 1;
+                } else {
+                    equals_head_size += 1;
+                }
+            }
             EditKind::Deletion => {
+                write_head_context(i, equals_head_size, writer)?;
+
                 writer.set_color(Color::Red)?;
                 writer.write(format!("-{}", edit.s))?;
                 writer.reset_formatting()?;
+
+                equals_head_size = 0;
+                equals_tail_left_to_write = MAX_DIFF_CONTEXT_LINES;
             }
             EditKind::Addition => {
+                write_head_context(i, equals_head_size, writer)?;
+
                 writer.set_color(Color::Green)?;
                 writer.write(format!("+{}", edit.s))?;
                 writer.reset_formatting()?;
+
+                equals_head_size = 0;
+                equals_tail_left_to_write = MAX_DIFF_CONTEXT_LINES;
             }
         }
     }
@@ -249,6 +283,7 @@ fn trace_edit_points(final_k: i32, trace: Vec<Vec<usize>>) -> Vec<(i32, i32)> {
         let y = x - k;
         edit_points.push((x, y));
     }
+
     edit_points
 }
 
@@ -294,6 +329,12 @@ fn compute_edit_script<S: Eq + Copy>(
             y -= 1;
             edits.push(Edit::addition(b[y as usize], y as usize));
         }
+    }
+
+    while x > 0 && y > 0 {
+        x -= 1;
+        y -= 1;
+        edits.push(Edit::equal(a[x as usize], x as usize, y as usize));
     }
 
     edits.reverse();
