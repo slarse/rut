@@ -1,6 +1,5 @@
 use std::{
     fmt::{Debug, Display},
-    cmp,
     fs, io,
     path::Path,
 };
@@ -53,55 +52,96 @@ fn diff_file(
     writer.write(format!("+++ b/{}", relative_path.display()))?;
 
     let edit_script = edit_script(&a_lines, &b_lines);
-    let mut equals_head_size = 0;
-    let mut equals_tail_left_to_write = 0;
+    let chunks = chunk_edit_script(&edit_script, MAX_DIFF_CONTEXT_LINES);
 
-    let write_head_context =
-        |i, equals_head_size, writer: &mut dyn OutputWriter| -> io::Result<()> {
-            let context_size = cmp::min(MAX_DIFF_CONTEXT_LINES, equals_head_size);
-            let equal_edits = &edit_script[i - context_size..i];
-
-            for edit in equal_edits {
-                writer.write(format!(" {}", edit.s))?;
-            }
-
-            Ok(())
-        };
-
-    for (i, edit) in edit_script.iter().enumerate() {
-        match edit.kind {
-            EditKind::Equal => {
-                if equals_tail_left_to_write > 0 {
+    for chunk in chunks {
+        for edit in chunk.edits {
+            match edit.kind {
+                EditKind::Equal => {
                     writer.write(format!(" {}", edit.s))?;
-                    equals_tail_left_to_write -= 1;
-                } else {
-                    equals_head_size += 1;
                 }
-            }
-            EditKind::Deletion => {
-                write_head_context(i, equals_head_size, writer)?;
-
-                writer.set_color(Color::Red)?;
-                writer.write(format!("-{}", edit.s))?;
-                writer.reset_formatting()?;
-
-                equals_head_size = 0;
-                equals_tail_left_to_write = MAX_DIFF_CONTEXT_LINES;
-            }
-            EditKind::Addition => {
-                write_head_context(i, equals_head_size, writer)?;
-
-                writer.set_color(Color::Green)?;
-                writer.write(format!("+{}", edit.s))?;
-                writer.reset_formatting()?;
-
-                equals_head_size = 0;
-                equals_tail_left_to_write = MAX_DIFF_CONTEXT_LINES;
+                EditKind::Deletion => {
+                    writer.set_color(Color::Red)?;
+                    writer.write(format!("-{}", edit.s))?;
+                    writer.reset_formatting()?;
+                }
+                EditKind::Addition => {
+                    writer.set_color(Color::Green)?;
+                    writer.write(format!("+{}", edit.s))?;
+                    writer.reset_formatting()?;
+                }
             }
         }
     }
 
     Ok(())
+}
+
+#[derive(Debug, PartialEq, Eq)]
+struct Chunk<'a, S: Eq> {
+    edits: Vec<&'a Edit<S>>,
+}
+
+impl<'a, S: Eq> Chunk<'a, S> {
+    fn new() -> Self {
+        Chunk { edits: vec![] }
+    }
+}
+
+fn chunk_edit_script<S: Eq + Debug>(edit_script: &[Edit<S>], context_size: usize) -> Vec<Chunk<S>> {
+    let mut chunks = vec![];
+    let mut chunk = Chunk::new();
+    let mut context = vec![];
+
+    let mut last_mutating_edit_idx = 0;
+
+    for (i, edit) in edit_script.iter().enumerate() {
+        match edit.kind {
+            EditKind::Equal => {
+                if i - last_mutating_edit_idx > context_size && chunk.edits.len() > 0 {
+                    println!(
+                        "i: {}, last_mutating_edit_idx: {}",
+                        i, last_mutating_edit_idx
+                    );
+                    chunk.edits.extend(context.drain(..));
+                    chunks.push(chunk);
+                    chunk = Chunk::new();
+                }
+
+                context.push(edit);
+            }
+            EditKind::Deletion => {
+                last_mutating_edit_idx = i;
+                drain_context_into_chunk(&mut context, &mut chunk.edits, context_size);
+                chunk.edits.push(edit);
+            }
+            EditKind::Addition => {
+                last_mutating_edit_idx = i;
+                drain_context_into_chunk(&mut context, &mut chunk.edits, context_size);
+                chunk.edits.push(edit);
+            }
+        }
+    }
+
+    if chunk.edits.len() > 0 {
+        drain_context_into_chunk(&mut context, &mut chunk.edits, context_size);
+        chunks.push(chunk);
+    }
+
+    chunks
+}
+
+fn drain_context_into_chunk<'b, 'a: 'b, S: Eq>(
+    context: &mut Vec<&'a Edit<S>>,
+    chunk_content: &mut Vec<&'b Edit<S>>,
+    context_size: usize,
+) {
+    let context_to_skip = if context.len() > context_size {
+        context.len() - context_size
+    } else {
+        0
+    };
+    chunk_content.extend(context.drain(..).skip(context_to_skip));
 }
 
 /**
