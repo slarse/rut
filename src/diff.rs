@@ -58,16 +58,16 @@ fn diff_file(
         for edit in chunk.edits {
             match edit.kind {
                 EditKind::Equal => {
-                    writer.write(format!(" {}", edit.s))?;
+                    writer.write(format!(" {}", edit.content))?;
                 }
                 EditKind::Deletion => {
                     writer.set_color(Color::Red)?;
-                    writer.write(format!("-{}", edit.s))?;
+                    writer.write(format!("-{}", edit.content))?;
                     writer.reset_formatting()?;
                 }
                 EditKind::Addition => {
                     writer.set_color(Color::Green)?;
-                    writer.write(format!("+{}", edit.s))?;
+                    writer.write(format!("+{}", edit.content))?;
                     writer.reset_formatting()?;
                 }
             }
@@ -166,13 +166,13 @@ pub fn diff<S: Eq + Copy + Display>(a: &[S], b: &[S]) -> String {
     for edit in edit_script {
         match edit.kind {
             EditKind::Equal => {
-                result.push_str(&format!(" {}", edit.s));
+                result.push_str(&format!(" {}", edit.content));
             }
             EditKind::Deletion => {
-                result.push_str(&format!("-{}", edit.s));
+                result.push_str(&format!("-{}", edit.content));
             }
             EditKind::Addition => {
-                result.push_str(&format!("+{}", edit.s));
+                result.push_str(&format!("+{}", edit.content));
             }
         }
         result.push_str("\n");
@@ -247,7 +247,7 @@ fn compute_edit_path_graph<S: Eq>(a: &[S], b: &[S]) -> (i32, Vec<Vec<usize>>) {
 
 #[derive(PartialEq, Eq)]
 pub struct Edit<S: Eq> {
-    s: S,
+    content: S,
     a_position: Option<usize>,
     b_position: Option<usize>,
     kind: EditKind,
@@ -264,7 +264,7 @@ impl<S: Eq + Debug> Debug for Edit<S> {
             f,
             "{:?}:{:?}:{:?}:{:?}",
             self.kind,
-            self.s,
+            self.content,
             to_position_string(self.a_position),
             to_position_string(self.b_position)
         )
@@ -272,27 +272,27 @@ impl<S: Eq + Debug> Debug for Edit<S> {
 }
 
 impl<S: Eq> Edit<S> {
-    pub fn addition(s: S, b_position: usize) -> Edit<S> {
+    pub fn addition(content: S, b_position: usize) -> Edit<S> {
         Edit {
-            s,
+            content,
             a_position: None,
             b_position: Some(b_position),
             kind: EditKind::Addition,
         }
     }
 
-    pub fn deletion(s: S, a_position: usize) -> Edit<S> {
+    pub fn deletion(content: S, a_position: usize) -> Edit<S> {
         Edit {
-            s,
+            content,
             a_position: Some(a_position),
             b_position: None,
             kind: EditKind::Deletion,
         }
     }
 
-    pub fn equal(s: S, a_position: usize, b_position: usize) -> Edit<S> {
+    pub fn equal(content: S, a_position: usize, b_position: usize) -> Edit<S> {
         Edit {
-            s,
+            content,
             a_position: Some(a_position),
             b_position: Some(b_position),
             kind: EditKind::Equal,
