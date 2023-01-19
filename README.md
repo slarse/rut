@@ -64,9 +64,8 @@ Rut currently supports the following subset of Git:
     - Currently does not attempt to identify renamed files
     - Accepts the `--porcelain` flag to output in a format that is easier to parse
 * `diff`
+    - Complete with context lines and color output!
     - Can only compare the worktree to the index
-    - Currently prints out all lines after the first edit hunk as opposed to
-      just +/- 3 lines from any diff hunk
     - Does not yet indicate where in the file revisions a diff hunk is located
 
 ## Upcoming features
