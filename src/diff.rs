@@ -99,10 +99,6 @@ fn chunk_edit_script<S: Eq + Debug>(edit_script: &[Edit<S>], context_size: usize
         match edit.kind {
             EditKind::Equal => {
                 if i - last_mutating_edit_idx > context_size && chunk.edits.len() > 0 {
-                    println!(
-                        "i: {}, last_mutating_edit_idx: {}",
-                        i, last_mutating_edit_idx
-                    );
                     chunk.edits.extend(context.drain(..));
                     chunks.push(chunk);
                     chunk = Chunk::new();
