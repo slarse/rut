@@ -12,7 +12,7 @@ pub trait GitObject<'a> {
     }
 
     fn short_id(&'a self) -> Vec<u8> {
-        to_short_id(&self.id()).into()
+        self.id()[0..7].to_vec()
     }
 
     fn short_id_as_string(&'a self) -> String {
