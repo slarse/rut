@@ -86,7 +86,7 @@ fn write_commit_status(commit: &Commit, writer: &mut dyn OutputWriter) -> io::Re
         to_hex_string(&commit.short_id()),
         first_line,
     );
-    writer.write(message)?;
+    writer.writeln(message)?;
     Ok(())
 }
 

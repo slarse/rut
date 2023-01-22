@@ -6,7 +6,7 @@ use std::{
     path::Path,
     path::PathBuf,
     process::{Command, Output},
-    str,
+    str, thread,
 };
 
 use rut::{
@@ -31,6 +31,10 @@ pub fn rut_commit_with_output_capture(
 pub fn rut_commit(commit_message: &str, repository: &Repository) -> io::Result<String> {
     fs::write(&repository.git_dir().join("COMMIT_EDITMSG"), commit_message)?;
     commit::commit(&repository, &mut NoopOutputWriter)?;
+
+    // sleep a little to ensure that we get a strict "happens-after" relationship the commit
+    // and anything that follows it
+    thread::sleep(std::time::Duration::from_millis(10));
     Ok(get_head_commit(&repository.git_dir()))
 }
 
@@ -67,8 +71,7 @@ struct CapturingOutputWriter {
 
 impl OutputWriter for CapturingOutputWriter {
     fn write(&mut self, content: String) -> io::Result<&mut dyn OutputWriter> {
-        let content_with_line_feed = content + "\n";
-        self.output.push_str(content_with_line_feed.as_str());
+        self.output.push_str(content.as_str());
         Ok(self)
     }
 

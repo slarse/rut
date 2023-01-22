@@ -150,11 +150,11 @@ fn write_human_readable(
 
     let mut written = false;
     if !staged_changes.is_empty() {
-        writer.write("Changes to be committed:".to_string())?;
+        writer.writeln("Changes to be committed:".to_string())?;
 
         writer.set_color(Color::Green)?;
         for change in staged_changes {
-            writer.write(format!("\t{}", change.human_readable_format()))?;
+            writer.writeln(format!("\t{}", change.human_readable_format()))?;
         }
         writer.reset_formatting()?;
 
@@ -163,13 +163,13 @@ fn write_human_readable(
 
     if !unstaged_changes.is_empty() {
         if written {
-            writer.write("".to_string())?;
+            writer.writeln("".to_string())?;
         }
 
-        writer.write("Changes not staged for commit:".to_string())?;
+        writer.writeln("Changes not staged for commit:".to_string())?;
         writer.set_color(Color::Red)?;
         for change in unstaged_changes {
-            writer.write(format!("\t{}", change.human_readable_format()))?;
+            writer.writeln(format!("\t{}", change.human_readable_format()))?;
         }
         writer.reset_formatting()?;
 
@@ -178,16 +178,16 @@ fn write_human_readable(
 
     if !untracked_paths.is_empty() {
         if written {
-            writer.write("".to_string())?;
+            writer.writeln("".to_string())?;
         }
 
-        writer.write("Untracked files:".to_string())?;
+        writer.writeln("Untracked files:".to_string())?;
         writer.set_color(Color::Red)?;
         print_paths("\t", untracked_paths, worktree, writer)?;
         writer.reset_formatting()?;
     }
 
-    writer.write("".to_string())?;
+    writer.writeln("".to_string())?;
     Ok(())
 }
 
@@ -199,7 +199,7 @@ fn write_porcelain(
 ) -> io::Result<()> {
     changes.sort_by(|lhs, rhs| lhs.path.cmp(&rhs.path));
     for change in changes {
-        writer.write(change.porcelain_format())?;
+        writer.writeln(change.porcelain_format())?;
     }
     print_paths("?? ", &untracked_paths, &worktree, writer)?;
     Ok(())
@@ -222,7 +222,7 @@ fn print_paths(
             relative_path.as_os_str().to_str().unwrap(),
             suffix
         );
-        writer.write(line)?;
+        writer.writeln(line)?;
     }
     Ok(())
 }

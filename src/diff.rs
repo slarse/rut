@@ -63,19 +63,20 @@ fn diff_file(
     )?;
 
     for chunk in chunks {
+        write_chunk_header(&chunk, writer)?;
         for edit in chunk.edits {
             match edit.kind {
                 EditKind::Equal => {
-                    writer.write(format!(" {}", edit.content))?;
+                    writer.writeln(format!(" {}", edit.content))?;
                 }
                 EditKind::Deletion => {
                     writer.set_color(Color::Red)?;
-                    writer.write(format!("-{}", edit.content))?;
+                    writer.writeln(format!("-{}", edit.content))?;
                     writer.reset_formatting()?;
                 }
                 EditKind::Addition => {
                     writer.set_color(Color::Green)?;
-                    writer.write(format!("+{}", edit.content))?;
+                    writer.writeln(format!("+{}", edit.content))?;
                     writer.reset_formatting()?;
                 }
             }
@@ -85,69 +86,136 @@ fn diff_file(
     Ok(())
 }
 
-fn write_header(
+fn write_chunk_header<'a, S: Eq>(
+    chunk: &Chunk<S>,
+    writer: &'a mut dyn OutputWriter,
+) -> io::Result<&'a mut dyn OutputWriter> {
+    let a_size = chunk.a_end - chunk.a_start;
+    let b_size = chunk.b_end - chunk.b_start;
+
+    writer
+        .set_color(Color::Cyan)?
+        .write(format!(
+            "@@ -{},{} +{},{} @@",
+            chunk.a_start, a_size, chunk.b_start, b_size
+        ))?
+        .reset_formatting()?;
+
+    if let Some(edit) = chunk.edits.first() {
+        if edit.kind != EditKind::Equal {
+            writer.linefeed()?;
+        }
+    }
+
+    Ok(writer)
+}
+
+fn write_header<'a>(
     path: &Path,
     a_oid: &str,
     b_oid: &str,
-    writer: &mut dyn OutputWriter,
-) -> io::Result<()> {
-    writer.write(format!(
-        "diff --git a/{} b/{}",
-        path.display(),
-        path.display()
-    ))?;
-    writer.write(format!("index {}..{}", a_oid, b_oid,))?;
-    writer.write(format!("--- a/{}", path.display()))?;
-    writer.write(format!("+++ b/{}", path.display()))?;
-
-    Ok(())
+    writer: &'a mut dyn OutputWriter,
+) -> io::Result<&'a mut dyn OutputWriter> {
+    writer
+        .writeln(format!(
+            "diff --git a/{} b/{}",
+            path.display(),
+            path.display()
+        ))?
+        .writeln(format!("index {}..{}", a_oid, b_oid,))?
+        .writeln(format!("--- a/{}", path.display()))?
+        .writeln(format!("+++ b/{}", path.display()))
 }
 
 #[derive(Debug, PartialEq, Eq)]
 struct Chunk<'a, S: Eq> {
     edits: Vec<&'a Edit<S>>,
+    a_start: usize,
+    a_end: usize,
+    b_start: usize,
+    b_end: usize,
 }
 
 impl<'a, S: Eq> Chunk<'a, S> {
-    fn new() -> Self {
-        Chunk { edits: vec![] }
+    fn new(edits: Vec<&'a Edit<S>>) -> Self {
+        let mut a_start = None;
+        let mut a_end = None;
+        let mut b_start = None;
+        let mut b_end = None;
+
+        for edit in edits.iter() {
+            match edit.kind {
+                EditKind::Equal => {
+                    if a_start.is_none() {
+                        a_start = edit.a_position;
+                    }
+                    if b_start.is_none() {
+                        b_start = edit.b_position;
+                    }
+                    a_end = edit.a_position;
+                    b_end = edit.b_position;
+                }
+                EditKind::Deletion => {
+                    if a_start.is_none() {
+                        a_start = edit.a_position;
+                    }
+                    a_end = edit.a_position;
+                }
+                EditKind::Addition => {
+                    if b_start.is_none() {
+                        b_start = edit.b_position;
+                    }
+                    b_end = edit.b_position;
+                }
+            }
+        }
+
+        Chunk {
+            edits,
+            // Note: Add 1 to make 1-indexed
+            a_start: a_start.unwrap() + 1,
+            // Note: Add 1 to make 1-indexed and another 1 to make range exclusive in end
+            a_end: a_end.unwrap() + 2,
+            b_start: b_start.unwrap() + 1,
+            b_end: b_end.unwrap() + 2,
+        }
     }
 }
 
 fn chunk_edit_script<S: Eq + Debug>(edit_script: &[Edit<S>], context_size: usize) -> Vec<Chunk<S>> {
     let mut chunks = vec![];
-    let mut chunk = Chunk::new();
-    let mut context = vec![];
+    let mut chunk_content: Vec<&Edit<S>> = vec![];
+    let mut context: Vec<&Edit<S>> = vec![];
 
     let mut last_mutating_edit_idx = 0;
 
     for (i, edit) in edit_script.iter().enumerate() {
         match edit.kind {
             EditKind::Equal => {
-                if i - last_mutating_edit_idx > context_size && chunk.edits.len() > 0 {
-                    chunk.edits.extend(context.drain(..));
-                    chunks.push(chunk);
-                    chunk = Chunk::new();
+                if i - last_mutating_edit_idx > context_size && chunk_content.len() > 0 {
+                    chunk_content.extend(context.drain(..));
+                    chunks.push(Chunk::new(chunk_content));
+                    chunk_content = vec![];
                 }
 
                 context.push(edit);
             }
             EditKind::Deletion => {
                 last_mutating_edit_idx = i;
-                drain_context_into_chunk(&mut context, &mut chunk.edits, context_size);
-                chunk.edits.push(edit);
+                drain_context_into_chunk(&mut context, &mut chunk_content, context_size);
+                chunk_content.push(edit);
             }
             EditKind::Addition => {
                 last_mutating_edit_idx = i;
-                drain_context_into_chunk(&mut context, &mut chunk.edits, context_size);
-                chunk.edits.push(edit);
+                drain_context_into_chunk(&mut context, &mut chunk_content, context_size);
+                chunk_content.push(edit);
             }
         }
     }
 
-    if chunk.edits.len() > 0 {
-        drain_context_into_chunk(&mut context, &mut chunk.edits, context_size);
-        chunks.push(chunk);
+    if chunk_content.len() > 0 {
+        drain_context_into_chunk(&mut context, &mut chunk_content, context_size);
+        chunks.push(Chunk::new(chunk_content));
     }
 
     chunks

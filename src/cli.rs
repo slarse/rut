@@ -51,7 +51,7 @@ pub struct StdoutWriter;
 
 impl OutputWriter for StdoutWriter {
     fn write(&mut self, content: String) -> io::Result<&mut dyn OutputWriter> {
-        println!("{}", content);
+        print!("{}", content);
         Ok(self)
     }
 
@@ -59,6 +59,7 @@ impl OutputWriter for StdoutWriter {
         let ansi_code = match color {
             Color::Red => "31",
             Color::Green => "32",
+            Color::Cyan => "36",
         };
         print!("\x1b[{}m", ansi_code);
         Ok(self)

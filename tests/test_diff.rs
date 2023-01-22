@@ -8,15 +8,15 @@ use rut_testhelpers;
 fn test_diff_shows_modified_unstaged_files() -> io::Result<()> {
     // arrange
     let repository = rut_testhelpers::create_repository();
-
+    println!("worktree: {:?}", repository.worktree().root());
     let file = repository.worktree().root().join("file.txt");
-    fs::write(&file, "First line\nSecond line\nThird line\n")?;
+    fs::write(&file, "First line\nSecond line\nThird line")?;
     let old_blob = Blob::new(fs::read(&file)?);
 
     rut_testhelpers::rut_add(&file, &repository);
     rut_testhelpers::rut_commit("First commit", &repository)?;
 
-    fs::write(&file, "Second line\nThird line\nFourth line\n")?;
+    fs::write(&file, "Second line\nThird line\nFourth line")?;
     let new_blob = Blob::new(fs::read(&file)?);
 
     // act
@@ -28,9 +28,10 @@ fn test_diff_shows_modified_unstaged_files() -> io::Result<()> {
         &old_blob,
         &new_blob,
     );
+    let expected_chunk_header = "@@ -1,3 +1,3 @@";
     let expected_output = format!(
-        "{}-First line\n Second line\n Third line\n+Fourth line\n \n",
-        expected_header
+        "{}{}\n-First line\n Second line\n Third line\n+Fourth line\n",
+        expected_header, expected_chunk_header,
     );
 
     assert_eq!(output, expected_output,);
@@ -62,7 +63,11 @@ fn test_diff_shows_context_lines() -> io::Result<()> {
         &old_blob,
         &new_blob,
     );
-    let expected_output = format!("{} 2\n 3\n 4\n-5\n 6\n 7\n 8\n", expected_header);
+    let expected_chunk_header = "@@ -2,7 +2,6 @@";
+    let expected_output = format!(
+        "{}{} 2\n 3\n 4\n-5\n 6\n 7\n 8\n",
+        expected_header, expected_chunk_header
+    );
     assert_eq!(output, expected_output);
 
     Ok(())
