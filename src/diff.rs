@@ -6,6 +6,8 @@ use std::{
 
 use crate::{
     index::Index,
+    objects::Blob,
+    objects::{self, GitObject},
     output::{Color, OutputWriter},
     status,
     workspace::Repository,
@@ -43,16 +45,22 @@ fn diff_file(
     );
 
     let a = String::from_utf8(a_raw).unwrap();
-    let b = fs::read_to_string(&file).unwrap();
+    let b_raw = fs::read(&file)?;
+    let b = String::from_utf8(b_raw.clone()).unwrap();
+    let b_blob = Blob::new(b_raw);
 
     let a_lines = a.split("\n").collect::<Vec<&str>>();
     let b_lines = b.split("\n").collect::<Vec<&str>>();
 
-    writer.write(format!("--- a/{}", relative_path.display()))?;
-    writer.write(format!("+++ b/{}", relative_path.display()))?;
-
     let edit_script = edit_script(&a_lines, &b_lines);
     let chunks = chunk_edit_script(&edit_script, MAX_DIFF_CONTEXT_LINES);
+
+    write_header(
+        &relative_path,
+        &objects::to_short_id(&a_index_entry.object_id),
+        &b_blob.short_id_as_string(),
+        writer,
+    )?;
 
     for chunk in chunks {
         for edit in chunk.edits {
@@ -73,6 +81,24 @@ fn diff_file(
             }
         }
     }
+
+    Ok(())
+}
+
+fn write_header(
+    path: &Path,
+    a_oid: &str,
+    b_oid: &str,
+    writer: &mut dyn OutputWriter,
+) -> io::Result<()> {
+    writer.write(format!(
+        "diff --git a/{} b/{}",
+        path.display(),
+        path.display()
+    ))?;
+    writer.write(format!("index {}..{}", a_oid, b_oid,))?;
+    writer.write(format!("--- a/{}", path.display()))?;
+    writer.write(format!("+++ b/{}", path.display()))?;
 
     Ok(())
 }

@@ -12,10 +12,18 @@ pub trait GitObject<'a> {
     }
 
     fn short_id(&'a self) -> Vec<u8> {
-        self.id()[0..7].to_vec()
+        to_short_id(&self.id()).into()
+    }
+
+    fn short_id_as_string(&'a self) -> String {
+        to_short_id(&self.id())
     }
 
     fn to_object_format(&self) -> Vec<u8>;
+}
+
+pub fn to_short_id(id: &[u8]) -> String {
+    hex::to_hex_string(&id[0..7])
 }
 
 pub struct Blob {
