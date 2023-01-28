@@ -1,4 +1,4 @@
-use std::{fs, io, path::Path};
+use std::{fs, io, path::Path, thread};
 
 use rut::objects::{Blob, GitObject};
 
@@ -71,6 +71,49 @@ fn test_diff_shows_context_lines() -> io::Result<()> {
     assert_eq!(output, expected_output);
 
     Ok(())
+}
+
+#[test]
+fn test_diff_omits_final_empty_line() -> io::Result<()> {
+    // arrange
+    let repository = rut_testhelpers::create_repository();
+
+    let file = repository.worktree().root().join("file.txt");
+    let initial_content = "1\n";
+    fs::write(&file, initial_content)?;
+    rut_testhelpers::rut_add(&file, &repository);
+    let old_blob = Blob::new(initial_content.as_bytes().to_vec());
+
+    wait_for_new_timestamp();
+    let new_content = "1\n2\n";
+    fs::write(&file, new_content)?;
+    let new_blob = Blob::new(new_content.as_bytes().to_vec());
+
+    // act
+    let output = rut_testhelpers::rut_diff(&repository)?;
+
+    // assert
+    let expected_header = create_expected_header(
+        repository.worktree().relativize_path(&file),
+        &old_blob,
+        &new_blob,
+    );
+    let expected_chunk_header = "@@ -1 +1,2 @@";
+    let expected_output = format!("{}{}\n 1\n+2\n", expected_header, expected_chunk_header);
+
+    assert_eq!(output, expected_output);
+
+    Ok(())
+}
+
+/**
+ * When writing very files in tests, there may not be enough time between writes to make for
+ * different timestamps between the writes. We therefore need to sleep a tiny amount before
+ * making a new write where there is a necessity to have it happen "strictly after" a previous
+ * write to the same file.
+ */
+fn wait_for_new_timestamp() {
+    thread::sleep(std::time::Duration::from_millis(10));
 }
 
 fn create_expected_header<P: AsRef<Path>>(filepath: P, old_blob: &Blob, new_blob: &Blob) -> String {

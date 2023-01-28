@@ -95,10 +95,20 @@ fn write_chunk_header<'a, S: Eq>(
 
     writer
         .set_color(Color::Cyan)?
-        .write(format!(
-            "@@ -{},{} +{},{} @@",
-            chunk.a_start, a_size, chunk.b_start, b_size
-        ))?
+        .write(String::from("@@"))?
+        .write(format!(" -{}", chunk.a_start))?
+        .write(if a_size > 1 {
+            format!(",{} ", a_size)
+        } else {
+            String::from(" ")
+        })?
+        .write(format!("+{}", chunk.b_start))?
+        .write(if b_size > 1 {
+            format!(",{} ", b_size)
+        } else {
+            String::from(" ")
+        })?
+        .write(String::from("@@"))?
         .reset_formatting()?;
 
     writer.linefeed()?;
@@ -178,10 +188,13 @@ impl<'a, S: Eq> Chunk<'a, S> {
     }
 }
 
-fn chunk_edit_script<S: Eq + Debug>(edit_script: &[Edit<S>], context_size: usize) -> Vec<Chunk<S>> {
+fn chunk_edit_script<'a>(
+    edit_script: &'a [Edit<&'a str>],
+    context_size: usize,
+) -> Vec<Chunk<'a, &'a str>> {
     let mut chunks = vec![];
-    let mut chunk_content: Vec<&Edit<S>> = vec![];
-    let mut context: Vec<&Edit<S>> = vec![];
+    let mut chunk_content: Vec<&Edit<&str>> = vec![];
+    let mut context: Vec<&Edit<&str>> = vec![];
 
     let mut last_mutating_edit_idx = 0;
 
@@ -194,7 +207,10 @@ fn chunk_edit_script<S: Eq + Debug>(edit_script: &[Edit<S>], context_size: usize
                     chunk_content = vec![];
                 }
 
-                context.push(edit);
+                if i < edit_script.len() - 1 || edit.content != "" {
+                    // we avoid adding context if it's the final edit and it's an empty line
+                    context.push(edit);
+                }
             }
             EditKind::Deletion => {
                 last_mutating_edit_idx = i;
