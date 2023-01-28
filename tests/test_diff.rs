@@ -65,7 +65,7 @@ fn test_diff_shows_context_lines() -> io::Result<()> {
     );
     let expected_chunk_header = "@@ -2,7 +2,6 @@";
     let expected_output = format!(
-        "{}{} 2\n 3\n 4\n-5\n 6\n 7\n 8\n",
+        "{}{}\n 2\n 3\n 4\n-5\n 6\n 7\n 8\n",
         expected_header, expected_chunk_header
     );
     assert_eq!(output, expected_output);

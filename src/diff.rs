@@ -101,11 +101,7 @@ fn write_chunk_header<'a, S: Eq>(
         ))?
         .reset_formatting()?;
 
-    if let Some(edit) = chunk.edits.first() {
-        if edit.kind != EditKind::Equal {
-            writer.linefeed()?;
-        }
-    }
+    writer.linefeed()?;
 
     Ok(writer)
 }
