@@ -134,7 +134,7 @@ pub fn rut_status(repository: &Repository, options: &status::Options) -> io::Res
 }
 
 pub fn rut_diff_default(repository: &Repository) -> io::Result<String> {
-    let options = diff::OptionsBuilder::default().cached(false).build().ok().unwrap();
+    let options = Default::default();
     rut_diff(repository, &options)
 }
 

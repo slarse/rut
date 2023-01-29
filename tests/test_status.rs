@@ -262,8 +262,6 @@ fn test_status_shows_untracked_file_in_tracked_directory() -> io::Result<()> {
     let untracked_file = tracked_directory.join("untracked.txt");
     fs::write(&untracked_file, "content")?;
 
-    println!("{:?}", repository.worktree().root());
-
     // act
     let output = rut_testhelpers::rut_status_porcelain(&repository)?;
 

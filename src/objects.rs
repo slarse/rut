@@ -35,7 +35,6 @@ impl Blob {
     pub fn new(bytes: Vec<u8>) -> Blob {
         let object_format = to_object_format("blob", &bytes);
         let id = hashing::sha1_hash(&object_format);
-
         Blob {
             bytes,
             id: id.to_vec(),
@@ -45,7 +44,7 @@ impl Blob {
     pub fn with_hash(bytes: Vec<u8>, id: &[u8]) -> Blob {
         Blob {
             bytes,
-            id: Vec::from(id),
+            id: id.to_vec(),
         }
     }
 

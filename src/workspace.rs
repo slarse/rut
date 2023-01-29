@@ -165,7 +165,8 @@ impl Database {
 
     pub fn load_blob(&self, blob_id: &[u8]) -> io::Result<Blob> {
         let content = self.load_data(blob_id)?;
-        Ok(Blob::with_hash(content, blob_id))
+        // TODO fix Blob::with_hash
+        Ok(Blob::new(content))
     }
 
     fn decompress<P: AsRef<Path>>(path: P) -> io::Result<Vec<u8>> {

@@ -39,10 +39,13 @@ pub fn run_command(args: Vec<String>) -> io::Result<()> {
             status::status(&repository, &status_options, &mut writer)?;
         }
         ["diff"] => {
+            let diff_options = Default::default();
+            diff::diff_repository(&repository, &diff_options, &mut writer)?;
+        }
+        ["diff", "--cached"] => {
             let diff_options = diff::OptionsBuilder::default()
-                .cached(false)
+                .cached(true)
                 .build()
-                .ok()
                 .unwrap();
             diff::diff_repository(&repository, &diff_options, &mut writer)?;
         }

@@ -68,12 +68,24 @@ pub fn status(
     index_lockfile.write()
 }
 
+pub fn resolve_files_with_staged_changes(
+    path_to_committed_id: &HashMap<PathBuf, String>,
+    repository: &Repository,
+    index: &Index,
+) -> io::Result<Vec<PathBuf>> {
+    let staged_changes = resolve_staged_modifications(path_to_committed_id, repository, index)?;
+    let worktree_root = repository.worktree().root();
+    let paths_with_staged_changes = staged_changes
+        .into_iter()
+        .map(|change| worktree_root.join(change.path));
+    Ok(paths_with_staged_changes.collect())
+}
+
 pub fn resolve_files_with_unstaged_changes(
+    path_to_committed_id: &HashMap<PathBuf, String>,
     repository: &Repository,
     index: &mut Index,
 ) -> io::Result<Vec<PathBuf>> {
-    let path_to_committed_id = resolve_committed_paths_and_ids(&repository)?;
-
     let worktree = repository.worktree();
     let tracked_paths = resolve_tracked_paths(&path_to_committed_id, &worktree, index);
 
@@ -84,7 +96,7 @@ pub fn resolve_files_with_unstaged_changes(
     Ok(paths_with_unstaged_changes.collect())
 }
 
-struct Change {
+pub struct Change {
     path: PathBuf,
     change_type: ChangeType,
     changed_in: ChangePlace,
@@ -117,12 +129,12 @@ impl Change {
     }
 }
 
-enum ChangePlace {
+pub enum ChangePlace {
     Worktree,
     Index,
 }
 
-enum ChangeType {
+pub enum ChangeType {
     Modified,
     Deleted,
     Created,
@@ -404,7 +416,7 @@ fn resolve_unstaged_deletions<'a>(
         })
 }
 
-fn resolve_committed_paths_and_ids(
+pub fn resolve_committed_paths_and_ids(
     repository: &Repository,
 ) -> io::Result<HashMap<PathBuf, String>> {
     let head_commit_id_opt = RefHandler::new(&repository).head();
@@ -432,7 +444,7 @@ fn resolve_committed_paths_and_ids(
     Ok(path_to_id)
 }
 
-fn resolve_unstaged_changes(
+pub fn resolve_unstaged_changes(
     tracked_paths: &[PathBuf],
     repository: &Repository,
     index: &mut Index,

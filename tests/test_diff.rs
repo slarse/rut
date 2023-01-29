@@ -8,7 +8,6 @@ use rut_testhelpers;
 fn test_diff_shows_modified_unstaged_files() -> io::Result<()> {
     // arrange
     let repository = rut_testhelpers::create_repository();
-    println!("worktree: {:?}", repository.worktree().root());
     let file = repository.worktree().root().join("file.txt");
     fs::write(&file, "First line\nSecond line\nThird line")?;
     let old_blob = Blob::new(fs::read(&file)?);
@@ -91,6 +90,46 @@ fn test_diff_omits_final_empty_line() -> io::Result<()> {
 
     // act
     let output = rut_testhelpers::rut_diff_default(&repository)?;
+
+    // assert
+    let expected_header = create_expected_header(
+        repository.worktree().relativize_path(&file),
+        &old_blob,
+        &new_blob,
+    );
+    let expected_chunk_header = "@@ -1 +1,2 @@";
+    let expected_output = format!("{}{}\n 1\n+2\n", expected_header, expected_chunk_header);
+
+    assert_eq!(output, expected_output);
+
+    Ok(())
+}
+
+#[test]
+fn test_diff_cached_shows_staged_changes() -> io::Result<()> {
+    // arrange
+    let repository = rut_testhelpers::create_repository();
+
+    let file = repository.worktree().root().join("file.txt");
+    let initial_content = "1\n";
+    fs::write(&file, initial_content)?;
+    rut_testhelpers::rut_add(&file, &repository);
+    rut_testhelpers::rut_commit("First commit", &repository)?;
+    let old_blob = Blob::new(initial_content.as_bytes().to_vec());
+
+    wait_for_new_timestamp();
+    let new_content = "1\n2\n";
+    fs::write(&file, new_content)?;
+    let new_blob = Blob::new(new_content.as_bytes().to_vec());
+    rut_testhelpers::rut_add(&file, &repository);
+
+    // act
+    let options = rut::diff::OptionsBuilder::default()
+        .cached(true)
+        .build()
+        .ok()
+        .unwrap();
+    let output = rut_testhelpers::rut_diff(&repository, &options)?;
 
     // assert
     let expected_header = create_expected_header(
