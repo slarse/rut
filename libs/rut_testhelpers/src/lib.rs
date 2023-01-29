@@ -133,11 +133,16 @@ pub fn rut_status(repository: &Repository, options: &status::Options) -> io::Res
     Ok(output_writer.output)
 }
 
-pub fn rut_diff(repository: &Repository) -> io::Result<String> {
+pub fn rut_diff_default(repository: &Repository) -> io::Result<String> {
+    let options = diff::OptionsBuilder::default().cached(false).build().ok().unwrap();
+    rut_diff(repository, &options)
+}
+
+pub fn rut_diff(repository: &Repository, options: &diff::Options) -> io::Result<String> {
     let mut output_writer = CapturingOutputWriter {
         output: String::new(),
     };
-    diff::diff_repository(repository, &mut output_writer)?;
+    diff::diff_repository(repository, options, &mut output_writer)?;
     Ok(output_writer.output)
 }
 

@@ -15,7 +15,16 @@ use crate::{
 
 const MAX_DIFF_CONTEXT_LINES: usize = 3;
 
-pub fn diff_repository(repository: &Repository, writer: &mut dyn OutputWriter) -> io::Result<()> {
+#[derive(Default, Builder, Debug)]
+pub struct Options {
+    pub cached: bool,
+}
+
+pub fn diff_repository(
+    repository: &Repository,
+    _options: &Options,
+    writer: &mut dyn OutputWriter,
+) -> io::Result<()> {
     let mut index = repository.load_index()?;
     let mut files_with_unstaged_changes =
         status::resolve_files_with_unstaged_changes(&repository, &mut index.as_mut())?;

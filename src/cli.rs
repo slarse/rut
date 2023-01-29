@@ -39,7 +39,12 @@ pub fn run_command(args: Vec<String>) -> io::Result<()> {
             status::status(&repository, &status_options, &mut writer)?;
         }
         ["diff"] => {
-            diff::diff_repository(&repository, &mut writer)?;
+            let diff_options = diff::OptionsBuilder::default()
+                .cached(false)
+                .build()
+                .ok()
+                .unwrap();
+            diff::diff_repository(&repository, &diff_options, &mut writer)?;
         }
         _ => panic!("unexpected command {:?}", sliced_args),
     };

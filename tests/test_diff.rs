@@ -20,7 +20,7 @@ fn test_diff_shows_modified_unstaged_files() -> io::Result<()> {
     let new_blob = Blob::new(fs::read(&file)?);
 
     // act
-    let output = rut_testhelpers::rut_diff(&repository)?;
+    let output = rut_testhelpers::rut_diff_default(&repository)?;
 
     // assert
     let expected_header = create_expected_header(
@@ -55,7 +55,7 @@ fn test_diff_shows_context_lines() -> io::Result<()> {
     let new_blob = Blob::new(fs::read(&file)?);
 
     // act
-    let output = rut_testhelpers::rut_diff(&repository)?;
+    let output = rut_testhelpers::rut_diff_default(&repository)?;
 
     // assert
     let expected_header = create_expected_header(
@@ -90,7 +90,7 @@ fn test_diff_omits_final_empty_line() -> io::Result<()> {
     let new_blob = Blob::new(new_content.as_bytes().to_vec());
 
     // act
-    let output = rut_testhelpers::rut_diff(&repository)?;
+    let output = rut_testhelpers::rut_diff_default(&repository)?;
 
     // assert
     let expected_header = create_expected_header(
@@ -107,7 +107,7 @@ fn test_diff_omits_final_empty_line() -> io::Result<()> {
 }
 
 /**
- * When writing very files in tests, there may not be enough time between writes to make for
+ * When writing tiny files in tests, there may not be enough time between writes to make for
  * different timestamps between the writes. We therefore need to sleep a tiny amount before
  * making a new write where there is a necessity to have it happen "strictly after" a previous
  * write to the same file.
