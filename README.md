@@ -65,7 +65,7 @@ Rut currently supports the following subset of Git:
     - Accepts the `--porcelain` flag to output in a format that is easier to parse
 * `diff`
     - Complete with context lines, chunk headers and color output!
-    - Can only compare the worktree to the index
+    - Accepts the `--cached` flag to compare the index to the last commit
 
 ## Upcoming features
 
