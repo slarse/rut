@@ -76,11 +76,7 @@ pub fn diff_repository(
  * TODO optimize, this is very wasteful if called multiple times without caching objects read from
  * disk in memory.
  */
-fn find_blob_in_tree(
-    relative_path: &Path,
-    tree: &Tree,
-    database: &Database,
-) -> io::Result<Blob> {
+fn find_blob_in_tree(relative_path: &Path, tree: &Tree, database: &Database) -> io::Result<Blob> {
     if relative_path.components().count() > 1 {
         find_blob_in_subtree(relative_path, tree, database)
     } else {
@@ -110,11 +106,7 @@ fn find_blob_in_subtree(
     find_blob_in_tree(&rest, &tree, database)
 }
 
-fn get_blob_from_tree(
-    relative_path: &Path,
-    tree: &Tree,
-    database: &Database,
-) -> io::Result<Blob> {
+fn get_blob_from_tree(relative_path: &Path, tree: &Tree, database: &Database) -> io::Result<Blob> {
     let file_name = relative_path.file_name().unwrap().to_str().unwrap();
 
     for entry in tree.entries() {
