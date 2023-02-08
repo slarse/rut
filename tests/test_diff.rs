@@ -1,6 +1,9 @@
 use std::{fs, io, path::Path, thread};
 
-use rut::objects::{Blob, GitObject};
+use rut::{
+    objects::{Blob, GitObject},
+    workspace::Repository,
+};
 
 use rut_testhelpers;
 
@@ -111,6 +114,50 @@ fn test_diff_cached_shows_staged_changes() -> io::Result<()> {
     let repository = rut_testhelpers::create_repository();
 
     let file = repository.worktree().root().join("file.txt");
+    let expected_diff = create_committed_file_with_staged_changes(&repository, &file)?;
+
+    // act
+    let options = rut::diff::OptionsBuilder::default()
+        .cached(true)
+        .build()
+        .ok()
+        .unwrap();
+    let output = rut_testhelpers::rut_diff(&repository, &options)?;
+
+    // assert
+    assert_eq!(output, expected_diff);
+
+    Ok(())
+}
+
+#[test]
+fn test_diff_cached_shows_staged_changes_in_subdirectory() -> io::Result<()> {
+    // arrange
+    let repository = rut_testhelpers::create_repository();
+
+    let subdirectory = repository.worktree().root().join("subdirectory");
+    fs::create_dir(&subdirectory)?;
+    let file = subdirectory.join("file.txt");
+    let expected_diff = create_committed_file_with_staged_changes(&repository, &file)?;
+
+    // act
+    let options = rut::diff::OptionsBuilder::default()
+        .cached(true)
+        .build()
+        .ok()
+        .unwrap();
+    let output = rut_testhelpers::rut_diff(&repository, &options)?;
+
+    // assert
+    assert_eq!(output, expected_diff);
+
+    Ok(())
+}
+
+fn create_committed_file_with_staged_changes(
+    repository: &Repository,
+    file: &Path,
+) -> io::Result<String> {
     let initial_content = "1\n";
     fs::write(&file, initial_content)?;
     rut_testhelpers::rut_add(&file, &repository);
@@ -123,15 +170,6 @@ fn test_diff_cached_shows_staged_changes() -> io::Result<()> {
     let new_blob = Blob::new(new_content.as_bytes().to_vec());
     rut_testhelpers::rut_add(&file, &repository);
 
-    // act
-    let options = rut::diff::OptionsBuilder::default()
-        .cached(true)
-        .build()
-        .ok()
-        .unwrap();
-    let output = rut_testhelpers::rut_diff(&repository, &options)?;
-
-    // assert
     let expected_header = create_expected_header(
         repository.worktree().relativize_path(&file),
         &old_blob,
@@ -140,9 +178,7 @@ fn test_diff_cached_shows_staged_changes() -> io::Result<()> {
     let expected_chunk_header = "@@ -1 +1,2 @@";
     let expected_output = format!("{}{}\n 1\n+2\n", expected_header, expected_chunk_header);
 
-    assert_eq!(output, expected_output);
-
-    Ok(())
+    Ok(expected_output)
 }
 
 /**
