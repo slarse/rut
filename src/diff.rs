@@ -29,42 +29,60 @@ pub fn diff_repository(
     options: &Options,
     writer: &mut dyn OutputWriter,
 ) -> io::Result<()> {
+    if options.cached {
+        diff_repository_cached(&repository, writer)
+    } else {
+        diff_repository_default(&repository, writer)
+    }
+}
+
+fn diff_repository_cached(
+    repository: &Repository,
+    writer: &mut dyn OutputWriter,
+) -> io::Result<()> {
+    let mut index = repository.load_index()?;
+    let path_to_committed_id = status::resolve_committed_paths_and_ids(&repository)?;
+    let files_with_staged_changes = status::resolve_files_with_staged_changes(
+        &path_to_committed_id,
+        &repository,
+        &mut index.as_mut(),
+    )?;
+
+    let head_commit_id = RefHandler::new(repository).head()?;
+    let head_commit = repository
+        .database
+        .load_commit(&hex::from_hex_string(&head_commit_id).unwrap())?;
+    let root_tree = repository
+        .database
+        .load_tree(&hex::from_hex_string(&head_commit.tree).unwrap())?;
+
+    for file in files_with_staged_changes {
+        let relative_path = repository.worktree().relativize_path(&file);
+        let staged_blob_id = &index.as_mut().get(&relative_path).unwrap().object_id;
+        let staged_blob = repository.database.load_blob(staged_blob_id)?;
+        let committed_blob = find_blob_in_tree(&relative_path, &root_tree, &repository.database)?;
+        diff_blobs(&committed_blob, &staged_blob, &relative_path, writer)?;
+    }
+
+    Ok(())
+}
+
+fn diff_repository_default(
+    repository: &Repository,
+    writer: &mut dyn OutputWriter,
+) -> io::Result<()> {
     let mut index = repository.load_index()?;
     let path_to_committed_id = status::resolve_committed_paths_and_ids(&repository)?;
 
-    if options.cached {
-        let files_with_staged_changes = status::resolve_files_with_staged_changes(
-            &path_to_committed_id,
-            &repository,
-            &mut index.as_mut(),
-        )?;
-        let head_commit_id = RefHandler::new(repository).head()?;
-        let head_commit = repository
-            .database
-            .load_commit(&hex::from_hex_string(&head_commit_id).unwrap())?;
-        let root_tree = repository
-            .database
-            .load_tree(&hex::from_hex_string(&head_commit.tree).unwrap())?;
+    let mut files_with_unstaged_changes = status::resolve_files_with_unstaged_changes(
+        &path_to_committed_id,
+        &repository,
+        &mut index.as_mut(),
+    )?;
+    files_with_unstaged_changes.sort();
 
-        for file in files_with_staged_changes {
-            let relative_path = repository.worktree().relativize_path(&file);
-            let staged_blob_id = &index.as_mut().get(&relative_path).unwrap().object_id;
-            let staged_blob = repository.database.load_blob(staged_blob_id)?;
-            let committed_blob =
-                find_blob_in_tree(&relative_path, &root_tree, &repository.database)?;
-            diff_blobs(&committed_blob, &staged_blob, &relative_path, writer)?;
-        }
-    } else {
-        let mut files_with_unstaged_changes = status::resolve_files_with_unstaged_changes(
-            &path_to_committed_id,
-            &repository,
-            &mut index.as_mut(),
-        )?;
-        files_with_unstaged_changes.sort();
-
-        for file in files_with_unstaged_changes {
-            diff_file(&file, &index.as_mut(), repository, writer)?;
-        }
+    for file in files_with_unstaged_changes {
+        diff_file(&file, &index.as_mut(), repository, writer)?;
     }
 
     Ok(())
