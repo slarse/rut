@@ -32,3 +32,5 @@ pub mod output;
 pub mod status;
 
 pub mod diff;
+
+mod object_resolver;

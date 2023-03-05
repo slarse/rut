@@ -26,6 +26,7 @@ pub fn to_short_id(id: &[u8]) -> String {
     hex::to_hex_string(&id[0..7])
 }
 
+#[derive(Clone)]
 pub struct Blob {
     bytes: Vec<u8>,
     id: Vec<u8>,

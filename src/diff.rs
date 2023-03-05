@@ -1,7 +1,7 @@
 use std::{
     fmt::{Debug, Display},
     fs, io,
-    path::{Path, PathBuf},
+    path::Path,
 };
 
 use crate::{
@@ -10,11 +10,11 @@ use crate::{
     objects,
     objects::Blob,
     objects::GitObject,
-    objects::Tree,
     output::{Color, OutputWriter},
     refs::RefHandler,
     status,
-    workspace::{Database, Repository},
+    object_resolver::ObjectResolver,
+    workspace::Repository,
 };
 
 const MAX_DIFF_CONTEXT_LINES: usize = 3;
@@ -52,15 +52,15 @@ fn diff_repository_cached(
     let head_commit = repository
         .database
         .load_commit(&hex::from_hex_string(&head_commit_id).unwrap())?;
-    let root_tree = repository
-        .database
-        .load_tree(&hex::from_hex_string(&head_commit.tree).unwrap())?;
+    let root_tree_id = hex::from_hex_string(&head_commit.tree).unwrap();
+
+    let mut object_cache = ObjectResolver::new(&root_tree_id, &repository.database);
 
     for file in files_with_staged_changes {
         let relative_path = repository.worktree().relativize_path(&file);
         let staged_blob_id = &index.as_mut().get(&relative_path).unwrap().object_id;
         let staged_blob = repository.database.load_blob(staged_blob_id)?;
-        let committed_blob = find_blob_in_tree(&relative_path, &root_tree, &repository.database)?;
+        let committed_blob = object_cache.find_blob_by_path(&relative_path)?;
         diff_blobs(&committed_blob, &staged_blob, &relative_path, writer)?;
     }
 
@@ -86,58 +86,6 @@ fn diff_repository_default(
     }
 
     Ok(())
-}
-
-/**
- * Find a blob in a tree by recursively traversing the tree.
- *
- * TODO optimize, this is very wasteful if called multiple times without caching objects read from
- * disk in memory.
- */
-fn find_blob_in_tree(relative_path: &Path, tree: &Tree, database: &Database) -> io::Result<Blob> {
-    if relative_path.components().count() > 1 {
-        find_blob_in_subtree(relative_path, tree, database)
-    } else {
-        get_blob_from_tree(relative_path, tree, database)
-    }
-}
-
-fn find_blob_in_subtree(
-    relative_path: &Path,
-    tree: &Tree,
-    database: &Database,
-) -> io::Result<Blob> {
-    let mut path_components = relative_path.iter().map(|p| p.to_str().unwrap());
-    let root_component = path_components.next().unwrap();
-
-    let mut rest = PathBuf::new();
-    for component in path_components {
-        rest = rest.join(component);
-    }
-
-    let tree_entry = tree
-        .entries()
-        .iter()
-        .find(|e| e.name == root_component)
-        .unwrap();
-    let tree = database.load_tree(&tree_entry.object_id).unwrap();
-    find_blob_in_tree(&rest, &tree, database)
-}
-
-fn get_blob_from_tree(relative_path: &Path, tree: &Tree, database: &Database) -> io::Result<Blob> {
-    let file_name = relative_path.file_name().unwrap().to_str().unwrap();
-
-    for entry in tree.entries() {
-        if entry.name == file_name {
-            let committed_blob = database.load_blob(&entry.object_id).unwrap();
-            return Ok(committed_blob);
-        }
-    }
-
-    Err(io::Error::new(
-        io::ErrorKind::NotFound,
-        format!("Could not find file {} in tree", relative_path.display()),
-    ))
 }
 
 fn diff_blobs(
