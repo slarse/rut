@@ -20,7 +20,11 @@ impl<'a> ObjectResolver<'a> {
         let root_tree = database.load_tree(root_tree_id).unwrap();
         let mut trees = HashMap::new();
         trees.insert(PathBuf::new(), root_tree);
-        Self { trees, database, blobs: HashMap::new() }
+        Self {
+            trees,
+            database,
+            blobs: HashMap::new(),
+        }
     }
 
     /**
@@ -98,7 +102,8 @@ impl<'a> ObjectResolver<'a> {
         for entry in tree.entries() {
             if entry.name == file_name {
                 let committed_blob = self.database.load_blob(&entry.object_id).unwrap();
-                self.blobs.insert(blob_path.to_path_buf(), committed_blob.clone());
+                self.blobs
+                    .insert(blob_path.to_path_buf(), committed_blob.clone());
                 return Ok(committed_blob);
             }
         }

@@ -7,13 +7,13 @@ use std::{
 use crate::{
     hex,
     index::Index,
+    object_resolver::ObjectResolver,
     objects,
     objects::Blob,
     objects::GitObject,
     output::{Color, OutputWriter},
     refs::RefHandler,
     status,
-    object_resolver::ObjectResolver,
     workspace::Repository,
 };
 
@@ -60,8 +60,13 @@ fn diff_repository_cached(
         let relative_path = repository.worktree().relativize_path(&file);
         let staged_blob_id = &index.as_mut().get(&relative_path).unwrap().object_id;
         let staged_blob = repository.database.load_blob(staged_blob_id)?;
-        let committed_blob = object_cache.find_blob_by_path(&relative_path)?;
-        diff_blobs(&committed_blob, &staged_blob, &relative_path, writer)?;
+        let committed_blob = object_cache.find_blob_by_path(&relative_path).ok();
+        diff_blobs(
+            committed_blob.as_ref(),
+            Some(&staged_blob),
+            &relative_path,
+            writer,
+        )?;
     }
 
     Ok(())
@@ -89,13 +94,19 @@ fn diff_repository_default(
 }
 
 fn diff_blobs(
-    committed_blob: &Blob,
-    staged_blob: &Blob,
+    committed_blob: Option<&Blob>,
+    staged_blob: Option<&Blob>,
     relative_path: &Path,
     writer: &mut dyn OutputWriter,
 ) -> io::Result<()> {
-    let committed_content = String::from_utf8(committed_blob.content().to_vec()).unwrap();
-    let staged_content = String::from_utf8(staged_blob.content().to_vec()).unwrap();
+    let committed_content = committed_blob
+        .map(|blob| String::from_utf8(blob.content().to_vec()).ok())
+        .flatten()
+        .unwrap_or("".to_string());
+    let staged_content = staged_blob
+        .map(|blob| String::from_utf8(blob.content().to_vec()).ok())
+        .flatten()
+        .unwrap_or("".to_string());
 
     let committed_lines = committed_content.lines().collect::<Vec<_>>();
     let staged_lines = staged_content.lines().collect::<Vec<_>>();
@@ -105,8 +116,8 @@ fn diff_blobs(
 
     write_header(
         relative_path,
-        &committed_blob.short_id_as_string(),
-        &staged_blob.short_id_as_string(),
+        committed_blob.map(|blob| blob.short_id_as_string()),
+        staged_blob.map(|blob| blob.short_id_as_string()),
         writer,
     )?;
 
@@ -144,8 +155,8 @@ fn diff_file(
 
     write_header(
         &relative_path,
-        &objects::to_short_id(&a_index_entry.object_id),
-        &b_blob.short_id_as_string(),
+        Some(objects::to_short_id(&a_index_entry.object_id)),
+        Some(b_blob.short_id_as_string()),
         writer,
     )?;
 
@@ -190,13 +201,13 @@ fn write_chunk_header<'a, S: Eq>(
         .set_color(Color::Cyan)?
         .write(String::from("@@"))?
         .write(format!(" -{}", chunk.a_start))?
-        .write(if a_size > 1 {
+        .write(if a_size != 1 {
             format!(",{} ", a_size)
         } else {
             String::from(" ")
         })?
         .write(format!("+{}", chunk.b_start))?
-        .write(if b_size > 1 {
+        .write(if b_size != 1 {
             format!(",{} ", b_size)
         } else {
             String::from(" ")
@@ -211,19 +222,32 @@ fn write_chunk_header<'a, S: Eq>(
 
 fn write_header<'a>(
     path: &Path,
-    a_oid: &str,
-    b_oid: &str,
+    a_oid: Option<String>,
+    b_oid: Option<String>,
     writer: &'a mut dyn OutputWriter,
 ) -> io::Result<&'a mut dyn OutputWriter> {
+    let a_path = a_oid
+        .as_ref()
+        .map(|_| format!("a/{}", path.display()))
+        .unwrap_or("/dev/null".to_string());
+    let b_path = b_oid
+        .as_ref()
+        .map(|_| format!("b/{}", path.display()))
+        .unwrap_or("/dev/null".to_string());
+
     writer
         .writeln(format!(
             "diff --git a/{} b/{}",
             path.display(),
             path.display()
         ))?
-        .writeln(format!("index {}..{}", a_oid, b_oid,))?
-        .writeln(format!("--- a/{}", path.display()))?
-        .writeln(format!("+++ b/{}", path.display()))
+        .writeln(format!(
+            "index {}..{}",
+            a_oid.unwrap_or("0000000".to_string()),
+            b_oid.unwrap_or("0000000".to_string())
+        ))?
+        .writeln(format!("--- {}", a_path))?
+        .writeln(format!("+++ {}", b_path))
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -272,11 +296,11 @@ impl<'a, S: Eq> Chunk<'a, S> {
         Chunk {
             edits,
             // Note: Add 1 to make 1-indexed
-            a_start: a_start.unwrap() + 1,
+            a_start: a_start.map(|x| x + 1).unwrap_or(0),
             // Note: Add 1 to make 1-indexed and another 1 to make range exclusive in end
-            a_end: a_end.unwrap() + 2,
-            b_start: b_start.unwrap() + 1,
-            b_end: b_end.unwrap() + 2,
+            a_end: a_end.map(|x| x + 2).unwrap_or(0),
+            b_start: b_start.map(|x| x + 1).unwrap_or(0),
+            b_end: b_end.map(|x| x + 2).unwrap_or(0),
         }
     }
 }

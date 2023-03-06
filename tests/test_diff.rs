@@ -154,6 +154,37 @@ fn test_diff_cached_shows_staged_changes_in_subdirectory() -> io::Result<()> {
     Ok(())
 }
 
+#[test]
+fn test_diff_cached_shows_staged_changes_of_new_file() -> io::Result<()> {
+    // arrange
+    let repository = rut_testhelpers::create_repository();
+    rut_testhelpers::rut_commit("First commit", &repository)?;
+
+    let file = repository.worktree().root().join("file.txt");
+    fs::write(&file, "First line\n")?;
+    rut_testhelpers::rut_add(&file, &repository);
+
+    // act
+    let options = rut::diff::OptionsBuilder::default()
+        .cached(true)
+        .build()
+        .ok()
+        .unwrap();
+    let output = rut_testhelpers::rut_diff(&repository, &options)?;
+
+    // assert
+    let expected_output = "diff --git a/file.txt b/file.txt
+index 0000000..9649cde
+--- /dev/null
++++ b/file.txt
+@@ -0,0 +1 @@
++First line
+";
+    assert_eq!(output, expected_output);
+
+    Ok(())
+}
+
 fn create_committed_file_with_staged_changes(
     repository: &Repository,
     file: &Path,
