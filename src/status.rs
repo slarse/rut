@@ -90,16 +90,19 @@ pub fn resolve_files_with_unstaged_changes(
     let tracked_paths = resolve_tracked_paths(&path_to_committed_id, &worktree, index);
 
     let unstaged_modifications = resolve_unstaged_modifications(&tracked_paths, &repository, index);
-    let paths_with_unstaged_changes =
-        unstaged_modifications.map(|change| worktree.root().join(change.path));
+    let unstaged_deletions = resolve_unstaged_deletions(&tracked_paths, repository.worktree());
+    let paths_with_unstaged_changes = unstaged_deletions
+        .into_iter()
+        .chain(unstaged_modifications.into_iter())
+        .map(|change| worktree.root().join(change.path));
 
     Ok(paths_with_unstaged_changes.collect())
 }
 
 pub struct Change {
-    path: PathBuf,
-    change_type: ChangeType,
-    changed_in: ChangePlace,
+    pub path: PathBuf,
+    pub change_type: ChangeType,
+    pub changed_in: ChangePlace,
 }
 
 impl Change {
@@ -239,7 +242,7 @@ fn print_paths(
     Ok(())
 }
 
-fn resolve_tracked_paths(
+pub fn resolve_tracked_paths(
     path_to_committed_id: &HashMap<PathBuf, String>,
     worktree: &Worktree,
     index: &Index,

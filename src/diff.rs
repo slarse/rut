@@ -6,7 +6,7 @@ use std::{
 
 use crate::{
     hex,
-    index::Index,
+    index::{Index, IndexEntry},
     object_resolver::ObjectResolver,
     objects,
     objects::Blob,
@@ -79,18 +79,74 @@ fn diff_repository_default(
     let mut index = repository.load_index()?;
     let path_to_committed_id = status::resolve_committed_paths_and_ids(&repository)?;
 
-    let mut files_with_unstaged_changes = status::resolve_files_with_unstaged_changes(
+    let tracked_paths = status::resolve_tracked_paths(
         &path_to_committed_id,
-        &repository,
-        &mut index.as_mut(),
-    )?;
-    files_with_unstaged_changes.sort();
+        repository.worktree(),
+        &index.as_mut(),
+    );
+    let mut unstaged_changes =
+        status::resolve_unstaged_changes(&tracked_paths, &repository, &mut index.as_mut());
+    unstaged_changes.sort_by(|a, b| a.path.cmp(&b.path));
 
-    for file in files_with_unstaged_changes {
-        diff_file(&file, &index.as_mut(), repository, writer)?;
+    for change in unstaged_changes {
+        diff_unstaged_change(&mut index.as_mut(), &change, &repository, writer)?;
     }
 
     Ok(())
+}
+
+fn diff_unstaged_change(
+    index: &mut Index,
+    change: &status::Change,
+    repository: &Repository,
+    writer: &mut dyn OutputWriter,
+) -> io::Result<()> {
+    let a_index_entry = index.get(&change.path).unwrap();
+    let (a_lines, a_oid) = read_blob_from_index_entry(a_index_entry, &repository)?;
+    let a_lines_ref = a_lines.iter().map(|s| s.as_str()).collect::<Vec<&str>>();
+
+    let (b_lines, b_oid) = read_blob_from_worktree(&change, &repository)?;
+    let b_lines_ref = b_lines.iter().map(|s| s.as_str()).collect::<Vec<&str>>();
+
+    diff_content(
+        &change.path,
+        &a_lines_ref,
+        a_oid,
+        &b_lines_ref,
+        b_oid,
+        writer,
+    )?;
+
+    Ok(())
+}
+
+fn read_blob_from_index_entry(
+    index_entry: &IndexEntry,
+    repository: &Repository,
+) -> io::Result<(Vec<String>, Option<String>)> {
+    let blob = repository.database.load_blob(&index_entry.object_id)?;
+    let content = String::from_utf8(blob.content().to_vec()).ok().unwrap();
+    let lines: Vec<String> = content.split("\n").map(|s| s.to_owned()).collect();
+    let object_id = Some(objects::to_short_id(&index_entry.object_id));
+    Ok((lines, object_id))
+}
+
+fn read_blob_from_worktree(
+    change: &status::Change,
+    repository: &Repository,
+) -> io::Result<(Vec<String>, Option<String>)> {
+    let (b_lines, b_oid) = match change.change_type {
+        status::ChangeType::Deleted => (vec![], None),
+        _ => {
+            let b_raw = fs::read(&repository.worktree().root().join(&change.path))?;
+            let b = String::from_utf8(b_raw.clone()).unwrap();
+            let b_blob = Blob::new(b_raw);
+            let b_lines = b.split("\n").map(|s| s.to_owned()).collect::<Vec<String>>();
+            let b_oid = Some(b_blob.short_id_as_string());
+            (b_lines, b_oid)
+        }
+    };
+    Ok((b_lines, b_oid))
 }
 
 fn diff_blobs(
@@ -126,40 +182,18 @@ fn diff_blobs(
     Ok(())
 }
 
-fn diff_file(
-    file: &Path,
-    index: &Index,
-    repository: &Repository,
+fn diff_content(
+    relative_path: &Path,
+    a_lines: &[&str],
+    a_oid: Option<String>,
+    b_lines: &[&str],
+    b_oid: Option<String>,
     writer: &mut dyn OutputWriter,
 ) -> io::Result<()> {
-    let relative_path = repository.worktree().relativize_path(&file);
-    let a_index_entry = index.get(&relative_path).unwrap();
-    let a_raw = Vec::from(
-        repository
-            .database
-            .load_blob(&a_index_entry.object_id)
-            .unwrap()
-            .content(),
-    );
-
-    let a = String::from_utf8(a_raw).unwrap();
-    let b_raw = fs::read(&file)?;
-    let b = String::from_utf8(b_raw.clone()).unwrap();
-    let b_blob = Blob::new(b_raw);
-
-    let a_lines = a.split("\n").collect::<Vec<&str>>();
-    let b_lines = b.split("\n").collect::<Vec<&str>>();
-
-    let edit_script = edit_script(&a_lines, &b_lines);
+    let edit_script = edit_script(a_lines, b_lines);
     let chunks = chunk_edit_script(&edit_script, MAX_DIFF_CONTEXT_LINES);
 
-    write_header(
-        &relative_path,
-        Some(objects::to_short_id(&a_index_entry.object_id)),
-        Some(b_blob.short_id_as_string()),
-        writer,
-    )?;
-
+    write_header(&relative_path, a_oid, b_oid, writer)?;
     write_chunks(&chunks, writer)?;
 
     Ok(())
@@ -324,15 +358,17 @@ fn chunk_edit_script<'a>(
                     chunk_content = vec![];
                 }
 
-                if i < edit_script.len() - 1 || edit.content != "" {
-                    // we avoid adding context if it's the final edit and it's an empty line
+                if should_show(edit, i, edit_script.len()) {
                     context.push(edit);
                 }
             }
             EditKind::Deletion => {
                 last_mutating_edit_idx = i;
                 drain_context_into_chunk(&mut context, &mut chunk_content, context_size);
-                chunk_content.push(edit);
+
+                if should_show(edit, i, edit_script.len()) {
+                    chunk_content.push(edit);
+                }
             }
             EditKind::Addition => {
                 last_mutating_edit_idx = i;
@@ -348,6 +384,14 @@ fn chunk_edit_script<'a>(
     }
 
     chunks
+}
+
+fn should_show(edit: &Edit<&str>, position: usize, edit_script_size: usize) -> bool {
+    if position < edit_script_size - 1 {
+        true
+    } else {
+        edit.content != ""
+    }
 }
 
 fn drain_context_into_chunk<'b, 'a: 'b, S: Eq>(

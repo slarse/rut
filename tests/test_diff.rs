@@ -185,6 +185,32 @@ index 0000000..9649cde
     Ok(())
 }
 
+#[test]
+fn test_diff_deleted_file() -> io::Result<()> {
+    // arrange
+    let repository = rut_testhelpers::create_repository();
+    let file = repository.worktree().root().join("file.txt");
+    fs::write(&file, "First line\n")?;
+    rut_testhelpers::rut_add(&file, &repository);
+    rut_testhelpers::rut_commit("First commit", &repository)?;
+    fs::remove_file(&file)?;
+
+    // act
+    let output = rut_testhelpers::rut_diff_default(&repository)?;
+
+    // assert
+    let expected_output = "diff --git a/file.txt b/file.txt
+index 9649cde..0000000
+--- a/file.txt
++++ /dev/null
+@@ -1 +0,0 @@
+-First line
+";
+    assert_eq!(output, expected_output);
+
+    Ok(())
+}
+
 fn create_committed_file_with_staged_changes(
     repository: &Repository,
     file: &Path,
