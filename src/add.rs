@@ -19,7 +19,7 @@ pub fn add<P: AsRef<Path>>(path: P, repository: &Repository) -> io::Result<()> {
 
     if absolute_path.exists() {
         for path in file::resolve_files(&absolute_path) {
-            add_file(&path, index.as_mut(), &repository)?;
+            add_file(&path, index.as_mut(), repository)?;
         }
     } else {
         let relative_path = repository.worktree().relativize_path(&absolute_path);
