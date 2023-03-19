@@ -30,9 +30,9 @@ pub fn diff_repository(
     writer: &mut dyn OutputWriter,
 ) -> io::Result<()> {
     if options.cached {
-        diff_repository_cached(&repository, writer)
+        diff_repository_cached(repository, writer)
     } else {
-        diff_repository_default(&repository, writer)
+        diff_repository_default(repository, writer)
     }
 }
 
@@ -41,11 +41,11 @@ fn diff_repository_cached(
     writer: &mut dyn OutputWriter,
 ) -> io::Result<()> {
     let mut index = repository.load_index()?;
-    let path_to_committed_id = status::resolve_committed_paths_and_ids(&repository)?;
+    let path_to_committed_id = status::resolve_committed_paths_and_ids(repository)?;
     let files_with_staged_changes = status::resolve_files_with_staged_changes(
         &path_to_committed_id,
-        &repository,
-        &mut index.as_mut(),
+        repository,
+        index.as_mut(),
     )?;
 
     let head_commit_id = RefHandler::new(repository).head()?;
@@ -57,7 +57,7 @@ fn diff_repository_cached(
     let mut object_cache = ObjectResolver::new(&root_tree_id, &repository.database);
 
     for file in files_with_staged_changes {
-        let relative_path = repository.worktree().relativize_path(&file);
+        let relative_path = repository.worktree().relativize_path(file);
         let staged_blob_id = &index.as_mut().get(&relative_path).unwrap().object_id;
         let staged_blob = repository.database.load_blob(staged_blob_id)?;
         let committed_blob = object_cache.find_blob_by_path(&relative_path).ok();
@@ -77,19 +77,16 @@ fn diff_repository_default(
     writer: &mut dyn OutputWriter,
 ) -> io::Result<()> {
     let mut index = repository.load_index()?;
-    let path_to_committed_id = status::resolve_committed_paths_and_ids(&repository)?;
+    let path_to_committed_id = status::resolve_committed_paths_and_ids(repository)?;
 
-    let tracked_paths = status::resolve_tracked_paths(
-        &path_to_committed_id,
-        repository.worktree(),
-        &index.as_mut(),
-    );
+    let tracked_paths =
+        status::resolve_tracked_paths(&path_to_committed_id, repository.worktree(), index.as_mut());
     let mut unstaged_changes =
-        status::resolve_unstaged_changes(&tracked_paths, &repository, &mut index.as_mut());
+        status::resolve_unstaged_changes(&tracked_paths, repository, index.as_mut());
     unstaged_changes.sort_by(|a, b| a.path.cmp(&b.path));
 
     for change in unstaged_changes {
-        diff_unstaged_change(&mut index.as_mut(), &change, &repository, writer)?;
+        diff_unstaged_change(index.as_mut(), &change, repository, writer)?;
     }
 
     Ok(())
@@ -102,10 +99,10 @@ fn diff_unstaged_change(
     writer: &mut dyn OutputWriter,
 ) -> io::Result<()> {
     let a_index_entry = index.get(&change.path).unwrap();
-    let (a_lines, a_oid) = read_blob_from_index_entry(a_index_entry, &repository)?;
+    let (a_lines, a_oid) = read_blob_from_index_entry(a_index_entry, repository)?;
     let a_lines_ref = a_lines.iter().map(|s| s.as_str()).collect::<Vec<&str>>();
 
-    let (b_lines, b_oid) = read_blob_from_worktree(&change, &repository)?;
+    let (b_lines, b_oid) = read_blob_from_worktree(change, repository)?;
     let b_lines_ref = b_lines.iter().map(|s| s.as_str()).collect::<Vec<&str>>();
 
     diff_content(
@@ -126,7 +123,7 @@ fn read_blob_from_index_entry(
 ) -> io::Result<(Vec<String>, Option<String>)> {
     let blob = repository.database.load_blob(&index_entry.object_id)?;
     let content = String::from_utf8(blob.content().to_vec()).ok().unwrap();
-    let lines: Vec<String> = content.split("\n").map(|s| s.to_owned()).collect();
+    let lines: Vec<String> = content.split('\n').map(|s| s.to_owned()).collect();
     let object_id = Some(objects::to_short_id(&index_entry.object_id));
     Ok((lines, object_id))
 }
@@ -138,10 +135,10 @@ fn read_blob_from_worktree(
     let (b_lines, b_oid) = match change.change_type {
         status::ChangeType::Deleted => (vec![], None),
         _ => {
-            let b_raw = fs::read(&repository.worktree().root().join(&change.path))?;
+            let b_raw = fs::read(repository.worktree().root().join(&change.path))?;
             let b = String::from_utf8(b_raw.clone()).unwrap();
             let b_blob = Blob::new(b_raw);
-            let b_lines = b.split("\n").map(|s| s.to_owned()).collect::<Vec<String>>();
+            let b_lines = b.split('\n').map(|s| s.to_owned()).collect::<Vec<String>>();
             let b_oid = Some(b_blob.short_id_as_string());
             (b_lines, b_oid)
         }
@@ -155,14 +152,13 @@ fn diff_blobs(
     relative_path: &Path,
     writer: &mut dyn OutputWriter,
 ) -> io::Result<()> {
+    let empty_string = || "".to_string();
     let committed_content = committed_blob
-        .map(|blob| String::from_utf8(blob.content().to_vec()).ok())
-        .flatten()
-        .unwrap_or("".to_string());
+        .and_then(|blob| String::from_utf8(blob.content().to_vec()).ok())
+        .unwrap_or_else(empty_string);
     let staged_content = staged_blob
-        .map(|blob| String::from_utf8(blob.content().to_vec()).ok())
-        .flatten()
-        .unwrap_or("".to_string());
+        .and_then(|blob| String::from_utf8(blob.content().to_vec()).ok())
+        .unwrap_or_else(empty_string);
 
     let committed_lines = committed_content.lines().collect::<Vec<_>>();
     let staged_lines = staged_content.lines().collect::<Vec<_>>();
@@ -193,7 +189,7 @@ fn diff_content(
     let edit_script = edit_script(a_lines, b_lines);
     let chunks = chunk_edit_script(&edit_script, MAX_DIFF_CONTEXT_LINES);
 
-    write_header(&relative_path, a_oid, b_oid, writer)?;
+    write_header(relative_path, a_oid, b_oid, writer)?;
     write_chunks(&chunks, writer)?;
 
     Ok(())
@@ -201,7 +197,7 @@ fn diff_content(
 
 fn write_chunks(chunks: &Vec<Chunk<&str>>, writer: &mut dyn OutputWriter) -> io::Result<()> {
     for chunk in chunks {
-        write_chunk_header(&chunk, writer)?;
+        write_chunk_header(chunk, writer)?;
         for edit in &chunk.edits {
             match edit.kind {
                 EditKind::Equal => {
@@ -263,11 +259,11 @@ fn write_header<'a>(
     let a_path = a_oid
         .as_ref()
         .map(|_| format!("a/{}", path.display()))
-        .unwrap_or("/dev/null".to_string());
+        .unwrap_or_else(|| "/dev/null".to_string());
     let b_path = b_oid
         .as_ref()
         .map(|_| format!("b/{}", path.display()))
-        .unwrap_or("/dev/null".to_string());
+        .unwrap_or_else(|| "/dev/null".to_string());
 
     writer
         .writeln(format!(
@@ -277,8 +273,8 @@ fn write_header<'a>(
         ))?
         .writeln(format!(
             "index {}..{}",
-            a_oid.unwrap_or("0000000".to_string()),
-            b_oid.unwrap_or("0000000".to_string())
+            a_oid.unwrap_or_else(|| "0000000".to_string()),
+            b_oid.unwrap_or_else(|| "0000000".to_string())
         ))?
         .writeln(format!("--- {}", a_path))?
         .writeln(format!("+++ {}", b_path))
@@ -352,8 +348,9 @@ fn chunk_edit_script<'a>(
     for (i, edit) in edit_script.iter().enumerate() {
         match edit.kind {
             EditKind::Equal => {
-                if i - last_mutating_edit_idx > context_size && chunk_content.len() > 0 {
-                    chunk_content.extend(context.drain(..));
+                if i - last_mutating_edit_idx > context_size && !chunk_content.is_empty() {
+                    chunk_content.append(&mut context);
+                    chunk_content.append(&mut context);
                     chunks.push(Chunk::new(chunk_content));
                     chunk_content = vec![];
                 }
@@ -378,7 +375,7 @@ fn chunk_edit_script<'a>(
         }
     }
 
-    if chunk_content.len() > 0 {
+    if !chunk_content.is_empty() {
         drain_context_into_chunk(&mut context, &mut chunk_content, context_size);
         chunks.push(Chunk::new(chunk_content));
     }
@@ -390,7 +387,7 @@ fn should_show(edit: &Edit<&str>, position: usize, edit_script_size: usize) -> b
     if position < edit_script_size - 1 {
         true
     } else {
-        edit.content != ""
+        !edit.content.is_empty()
     }
 }
 
@@ -438,7 +435,7 @@ pub fn diff<S: Eq + Copy + Display>(a: &[S], b: &[S]) -> String {
                 result.push_str(&format!("+{}", edit.content));
             }
         }
-        result.push_str("\n");
+        result.push('\n');
     }
     result
 }
@@ -485,7 +482,7 @@ fn compute_edit_path_graph<S: Eq>(a: &[S], b: &[S]) -> (i32, Vec<Vec<usize>>) {
                 *get(&v, k + 1)
             } else {
                 *get(&v, k - 1) + 1
-            } as usize;
+            };
 
             let mut y = (x as i32 - k) as usize;
 
@@ -581,8 +578,8 @@ fn trace_edit_points(final_k: i32, trace: Vec<Vec<usize>>) -> Vec<(i32, i32)> {
 
     for d in (0..trace.len() - 1).rev() {
         let v = &trace[d];
-        k = compute_previous_k(k, d as i32, &v);
-        let x = *get(&v, k) as i32;
+        k = compute_previous_k(k, d as i32, v);
+        let x = *get(v, k) as i32;
         let y = x - k;
         edit_points.push((x, y));
     }
