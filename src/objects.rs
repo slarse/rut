@@ -1,4 +1,5 @@
-use std::{fmt::Display, path::PathBuf, str};
+use std::path::Path;
+use std::{fmt::Display, str};
 
 use crate::hashing;
 use crate::hex;
@@ -65,7 +66,7 @@ impl<'a> GitObject<'a> for Blob {
 }
 
 fn to_object_format(object_type: &str, bytes: &[u8]) -> Vec<u8> {
-    let mut object_format: Vec<u8> = Vec::from(object_type.as_bytes().to_vec());
+    let mut object_format = object_type.as_bytes().to_vec();
     let byte_count = format!(" {}", bytes.len());
 
     object_format.extend_from_slice(byte_count.as_bytes());
@@ -82,11 +83,11 @@ pub struct TreeEntry {
 }
 
 impl TreeEntry {
-    pub fn new(path: &PathBuf, object_id: Vec<u8>, mode: FileMode) -> TreeEntry {
+    pub fn new(path: &Path, object_id: Vec<u8>, mode: FileMode) -> TreeEntry {
         let name = path
             .file_name()
             .and_then(|name| name.to_str())
-            .and_then(|name| Some(name.to_owned()))
+            .map(|name| name.to_owned())
             .unwrap();
         TreeEntry {
             name,
@@ -193,7 +194,7 @@ impl<'a> GitObject<'a> for Commit {
             }
         };
 
-        to_object_format("commit", &content.as_bytes())
+        to_object_format("commit", content.as_bytes())
     }
 }
 

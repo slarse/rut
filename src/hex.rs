@@ -13,7 +13,7 @@ pub fn from_hex_string(hex: &str) -> Option<Vec<u8>> {
 }
 
 pub fn from_hex_bytes(hex: &[u8]) -> Option<Vec<u8>> {
-    hex.into_iter()
+    hex.iter()
         .map(|hex_byte| u8::from_str_radix(&hex_byte.to_string(), 16).ok())
         .collect()
 }
