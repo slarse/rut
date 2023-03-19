@@ -157,7 +157,7 @@ impl Index {
     }
 
     fn insert_into_directories_map<P: AsRef<Path>>(&mut self, path: P) {
-        if let Some(directory) = path.as_ref().ancestors().skip(1).next() {
+        if let Some(directory) = path.as_ref().ancestors().nth(1) {
             let subdirs = if let Some(subdirs) = self.directories.get_mut(directory) {
                 subdirs
             } else {
@@ -252,6 +252,12 @@ impl Index {
     }
 }
 
+impl Default for Index {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl AsVec<u8> for Index {
     fn as_vec(&self) -> Vec<u8> {
         let signature = SIGNATURE.as_bytes();
@@ -300,8 +306,8 @@ impl IndexEntry {
         let dev = metadata.st_dev() as u32;
         let ino = metadata.st_ino() as u32;
         let mode = Mode::new(metadata.st_mode());
-        let uid = metadata.st_uid() as u32;
-        let gid = metadata.st_gid() as u32;
+        let uid = metadata.st_uid();
+        let gid = metadata.st_gid();
         let file_size = metadata.st_size() as u32;
 
         IndexEntry {
@@ -368,7 +374,7 @@ struct Mode {
 
 impl Mode {
     fn new(actual_mode: u32) -> Mode {
-        let world_executable_bits = 0o700 as u32;
+        let world_executable_bits = 0o700_u32;
         if actual_mode & world_executable_bits == world_executable_bits {
             Mode {
                 file_mode: FileMode::Executable,
