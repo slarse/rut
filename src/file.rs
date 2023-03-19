@@ -20,20 +20,19 @@ pub fn read_file<P: AsRef<Path>>(path: P) -> io::Result<Vec<u8>> {
  * Atomically write to a file by first writing to a temporary file and then renaming it to the
  * target file.
  */
-pub fn atomic_write(path: &PathBuf, mut content: &[u8]) -> io::Result<()> {
+pub fn atomic_write(path: &PathBuf, content: &[u8]) -> io::Result<()> {
     let mut buffer_file = PathBuf::from(path);
     let buffer_file_extension = format!(
         "{}.rut-tmp-buffer",
         buffer_file
             .extension()
-            .map(|extension| extension.to_str())
-            .flatten()
+            .and_then(|extension| extension.to_str())
             .unwrap_or("ext")
     );
     buffer_file.set_extension(buffer_file_extension);
 
-    fs::write(&buffer_file, &mut content)?;
-    fs::rename(&buffer_file, &path)
+    fs::write(&buffer_file, content)?;
+    fs::rename(&buffer_file, path)
 }
 
 /**
@@ -76,14 +75,14 @@ impl LockFile {
         })
     }
 
-    pub fn write(&mut self, mut text: &[u8]) -> io::Result<()> {
+    pub fn write(&mut self, text: &[u8]) -> io::Result<()> {
         self.has_write = true;
-        self.lockfile.write_all(&mut text)
+        self.lockfile.write_all(text)
     }
 
     fn handle_lockfile_create_failure(
         result: Result<File, io::Error>,
-        lockfile_path: &PathBuf,
+        lockfile_path: &Path,
     ) -> std::io::Result<File> {
         match result {
             ok @ Ok(_) => ok,
@@ -209,11 +208,11 @@ impl<T: AsVec<u8>> LockFileResource<T> {
      * original resource once this struct is destroyed.
      */
     pub fn write(&mut self) -> io::Result<()> {
-        self.lockfile.write(&mut self.resource.as_vec())
+        self.lockfile.write(&self.resource.as_vec())
     }
 }
 
-impl<'a, T: AsVec<u8>> AsMut<T> for LockFileResource<T> {
+impl<T: AsVec<u8>> AsMut<T> for LockFileResource<T> {
     fn as_mut(&mut self) -> &mut T {
         &mut self.resource
     }
@@ -224,7 +223,7 @@ where
     F: Fn(&DirEntry) -> bool,
 {
     if root_path.is_dir() {
-        WalkDir::new(&root_path)
+        WalkDir::new(root_path)
             .into_iter()
             .filter_entry(|entry| filter(entry) && !(is_hidden(entry) || is_ignored(entry)))
             .flat_map(|maybe_entry| maybe_entry.map(|entry| PathBuf::from(entry.path())))
@@ -246,7 +245,7 @@ fn is_hidden(entry: &DirEntry) -> bool {
     entry
         .file_name()
         .to_str()
-        .map(|s| s != "." && s.starts_with("."))
+        .map(|s| s != "." && s.starts_with('.'))
         .unwrap_or(false)
 }
 
