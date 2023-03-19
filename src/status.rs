@@ -38,20 +38,20 @@ pub fn status(
     let worktree = repository.worktree();
     let mut index_lockfile = repository.load_index()?;
     let index = index_lockfile.as_mut();
-    let path_to_committed_id = resolve_committed_paths_and_ids(&repository)?;
+    let path_to_committed_id = resolve_committed_paths_and_ids(repository)?;
 
-    let tracked_paths = resolve_tracked_paths(&path_to_committed_id, &worktree, index);
-    let untracked_paths = resolve_untracked(&tracked_paths, &worktree, index);
+    let tracked_paths = resolve_tracked_paths(&path_to_committed_id, worktree, index);
+    let untracked_paths = resolve_untracked(&tracked_paths, worktree, index);
 
-    let mut unstaged_changes = resolve_unstaged_changes(&tracked_paths, &repository, index);
-    let mut staged_changes = resolve_staged_changes(&path_to_committed_id, &repository, index)?;
+    let mut unstaged_changes = resolve_unstaged_changes(&tracked_paths, repository, index);
+    let mut staged_changes = resolve_staged_changes(&path_to_committed_id, repository, index)?;
 
     match options.output_format {
         OutputFormat::HumanReadable => write_human_readable(
             &mut staged_changes,
             &mut unstaged_changes,
             &untracked_paths,
-            &worktree,
+            worktree,
             writer,
         )?,
         OutputFormat::Porcelain => {
@@ -61,7 +61,7 @@ pub fn status(
                 .chain(staged_changes)
                 .collect::<Vec<_>>();
 
-            write_porcelain(&mut all_changes, &untracked_paths, &worktree, writer)?
+            write_porcelain(&mut all_changes, &untracked_paths, worktree, writer)?
         }
     }
 
@@ -87,9 +87,9 @@ pub fn resolve_files_with_unstaged_changes(
     index: &mut Index,
 ) -> io::Result<Vec<PathBuf>> {
     let worktree = repository.worktree();
-    let tracked_paths = resolve_tracked_paths(&path_to_committed_id, &worktree, index);
+    let tracked_paths = resolve_tracked_paths(path_to_committed_id, worktree, index);
 
-    let unstaged_modifications = resolve_unstaged_modifications(&tracked_paths, &repository, index);
+    let unstaged_modifications = resolve_unstaged_modifications(&tracked_paths, repository, index);
     let unstaged_deletions = resolve_unstaged_deletions(&tracked_paths, repository.worktree());
     let paths_with_unstaged_changes = unstaged_deletions
         .into_iter()
@@ -216,7 +216,7 @@ fn write_porcelain(
     for change in changes {
         writer.writeln(change.porcelain_format())?;
     }
-    print_paths("?? ", &untracked_paths, &worktree, writer)?;
+    print_paths("?? ", untracked_paths, worktree, writer)?;
     Ok(())
 }
 
@@ -229,7 +229,7 @@ fn print_paths(
     let mut sorted_paths = paths.iter().collect::<Vec<&PathBuf>>();
     sorted_paths.sort();
     for path in sorted_paths {
-        let relative_path = worktree.relativize_path(&path);
+        let relative_path = worktree.relativize_path(path);
         let suffix = if path.is_dir() { "/" } else { "" };
         let line = format!(
             "{}{}{}",
@@ -340,9 +340,7 @@ fn resolve_staged_modifications(
         }
 
         let relative_path = repository.worktree().relativize_path(entry.path());
-        let is_staged = index.has_entry(relative_path);
-
-        is_staged
+        index.has_entry(relative_path)
     };
 
     let staged_paths: Vec<PathBuf> =
@@ -398,7 +396,7 @@ fn resolve_staged_deletions(
         .filter(|path| !index.has_entry(path))
         .map(|path| worktree.root().join(path))
         .map(|path| Change {
-            path: worktree.relativize_path(&path),
+            path: worktree.relativize_path(path),
             change_type: ChangeType::Deleted,
             changed_in: ChangePlace::Index,
         })
@@ -413,7 +411,7 @@ fn resolve_unstaged_deletions<'a>(
         .iter()
         .filter(|path| !path.exists())
         .map(|path| Change {
-            path: worktree.relativize_path(&path),
+            path: worktree.relativize_path(path),
             change_type: ChangeType::Deleted,
             changed_in: ChangePlace::Worktree,
         })
@@ -422,7 +420,7 @@ fn resolve_unstaged_deletions<'a>(
 pub fn resolve_committed_paths_and_ids(
     repository: &Repository,
 ) -> io::Result<HashMap<PathBuf, String>> {
-    let head_commit_id_opt = RefHandler::new(&repository).head();
+    let head_commit_id_opt = RefHandler::new(repository).head();
     if head_commit_id_opt.is_err() {
         return Ok(HashMap::new());
     }
@@ -467,14 +465,14 @@ fn resolve_unstaged_modifications<'a>(
 ) -> impl Iterator<Item = Change> + 'a {
     let worktree = repository.worktree();
     tracked_paths
-        .into_iter()
+        .iter()
         .filter(|path| {
-            is_modified(&path, &worktree.relativize_path(&path), index)
+            is_modified(path, &worktree.relativize_path(path), index)
                 .ok()
                 .unwrap_or(false)
         })
         .map(|path| Change {
-            path: repository.worktree().relativize_path(&path),
+            path: repository.worktree().relativize_path(path),
             change_type: ChangeType::Modified,
             changed_in: ChangePlace::Worktree,
         })
