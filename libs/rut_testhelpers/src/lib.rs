@@ -23,14 +23,13 @@ pub fn rut_commit_with_output_capture(
     let mut output_writer = CapturingOutputWriter {
         output: String::new(),
     };
-    fs::write(&repository.git_dir().join("COMMIT_EDITMSG"), commit_message)?;
-    commit::commit(&repository, &mut output_writer)?;
+    commit::commit(&repository, Some(commit_message), &mut output_writer)?;
     Ok(output_writer.output)
 }
 
 pub fn rut_commit(commit_message: &str, repository: &Repository) -> io::Result<String> {
     fs::write(&repository.git_dir().join("COMMIT_EDITMSG"), commit_message)?;
-    commit::commit(&repository, &mut NoopOutputWriter)?;
+    commit::commit(&repository, Some(commit_message), &mut NoopOutputWriter)?;
 
     // sleep a little to ensure that we get a strict "happens-after" relationship the commit
     // and anything that follows it

@@ -19,7 +19,10 @@ struct Args {
 #[derive(Subcommand, Debug)]
 enum Action {
     Init,
-    Commit,
+    Commit {
+        #[clap(short, long)]
+        message: Option<String>,
+    },
     Add {
         path: String,
     },
@@ -49,8 +52,8 @@ pub fn run_command(args: Vec<String>) -> io::Result<()> {
         Action::Init => {
             init::init(&git_dir, &mut writer)?;
         }
-        Action::Commit => {
-            commit::commit(&repository, &mut writer)?;
+        Action::Commit { message } => {
+            commit::commit(&repository, message.as_deref(), &mut writer)?;
         }
         Action::Add { path } => {
             add::add(resolve_path(&path)?, &repository)?;

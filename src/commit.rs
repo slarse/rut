@@ -10,7 +10,14 @@ use crate::output::OutputWriter;
 use crate::refs::RefHandler;
 use crate::workspace::Repository;
 
-pub fn commit(repository: &Repository, writer: &mut dyn OutputWriter) -> io::Result<()> {
+pub fn commit(
+    repository: &Repository,
+    message: Option<&str>,
+    writer: &mut dyn OutputWriter,
+) -> io::Result<()> {
+    if let Some(message) = message {
+        fs::write(repository.git_dir().join("COMMIT_EDITMSG"), message)?;
+    }
     let mut index = repository.load_index()?;
 
     let head_ref = repository.head().expect("HEAD does not exist");
