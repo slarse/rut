@@ -2,8 +2,6 @@ use std::{fs, io};
 
 use rut::workspace::Repository;
 
-use rut_testhelpers;
-
 #[test]
 fn test_first_commit_denoted_as_root_commit_in_status_message() -> io::Result<()> {
     // arrange

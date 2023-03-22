@@ -5,8 +5,6 @@ use rut::{
     workspace::Repository,
 };
 
-use rut_testhelpers;
-
 #[test]
 fn test_diff_shows_modified_unstaged_files() -> io::Result<()> {
     // arrange
@@ -216,19 +214,19 @@ fn create_committed_file_with_staged_changes(
     file: &Path,
 ) -> io::Result<String> {
     let initial_content = "1\n";
-    fs::write(&file, initial_content)?;
-    rut_testhelpers::rut_add(&file, &repository);
-    rut_testhelpers::rut_commit("First commit", &repository)?;
+    fs::write(file, initial_content)?;
+    rut_testhelpers::rut_add(file, repository);
+    rut_testhelpers::rut_commit("First commit", repository)?;
     let old_blob = Blob::new(initial_content.as_bytes().to_vec());
 
     wait_for_new_timestamp();
     let new_content = "1\n2\n";
-    fs::write(&file, new_content)?;
+    fs::write(file, new_content)?;
     let new_blob = Blob::new(new_content.as_bytes().to_vec());
-    rut_testhelpers::rut_add(&file, &repository);
+    rut_testhelpers::rut_add(file, repository);
 
     let expected_header = create_expected_header(
-        repository.worktree().relativize_path(&file),
+        repository.worktree().relativize_path(file),
         &old_blob,
         &new_blob,
     );

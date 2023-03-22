@@ -2,8 +2,6 @@ use std::{fs, io};
 
 use rut::status;
 
-use rut_testhelpers;
-
 #[test]
 fn test_status_shows_untracked_file() -> io::Result<()> {
     // arrange
@@ -77,7 +75,7 @@ fn test_status_shows_entire_directory_as_untracked() -> io::Result<()> {
     let untracked_directory = repository.worktree().root().join("untracked");
     let untracked_file = untracked_directory.join("file.txt");
     fs::create_dir(untracked_directory)?;
-    fs::write(&untracked_file, "content")?;
+    fs::write(untracked_file, "content")?;
 
     // act
     let output = rut_testhelpers::rut_status_porcelain(&repository)?;
@@ -98,8 +96,8 @@ fn test_output_path_sorting() -> io::Result<()> {
     let untracked_file = untracked_directory.join("file.txt");
     let other_untracked_file = workdir.join("file.txt");
     fs::create_dir(untracked_directory)?;
-    fs::write(&untracked_file, "content")?;
-    fs::write(&other_untracked_file, "content")?;
+    fs::write(untracked_file, "content")?;
+    fs::write(other_untracked_file, "content")?;
 
     // act
     let output = rut_testhelpers::rut_status_porcelain(&repository)?;
@@ -230,7 +228,7 @@ fn test_human_readable_format() -> io::Result<()> {
     rut_testhelpers::rut_add(&staged_file, &repository);
 
     let untracked_file = workdir.join("untracked.txt");
-    fs::write(&untracked_file, "content")?;
+    fs::write(untracked_file, "content")?;
 
     let options = status::OptionsBuilder::default()
         .output_format(status::OutputFormat::HumanReadable)
@@ -255,12 +253,12 @@ fn test_status_shows_untracked_file_in_tracked_directory() -> io::Result<()> {
     let tracked_directory = workdir.join("tracked");
     let tracked_file = tracked_directory.join("file.txt");
     fs::create_dir(&tracked_directory)?;
-    fs::write(&tracked_file, "content")?;
+    fs::write(tracked_file, "content")?;
     rut_testhelpers::rut_add(&tracked_directory, &repository);
     rut_testhelpers::rut_commit("First commit", &repository)?;
 
     let untracked_file = tracked_directory.join("untracked.txt");
-    fs::write(&untracked_file, "content")?;
+    fs::write(untracked_file, "content")?;
 
     // act
     let output = rut_testhelpers::rut_status_porcelain(&repository)?;

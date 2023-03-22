@@ -14,7 +14,7 @@ pub fn commit(repository: &Repository, writer: &mut dyn OutputWriter) -> io::Res
     let mut index = repository.load_index()?;
 
     let head_ref = repository.head().expect("HEAD does not exist");
-    let commit = create_commit(&repository, index.as_mut(), &head_ref)?;
+    let commit = create_commit(repository, index.as_mut(), &head_ref)?;
     repository.database.store_object(&commit)?;
 
     fs::write(repository.git_dir().join(&head_ref), commit.id_as_string())?;
@@ -35,12 +35,12 @@ pub fn create_commit<'a>(
     }
     repository.database.store_object(&root_tree)?;
 
-    let ref_handler = RefHandler::new(&repository);
-    let parent_commit = ref_handler.deref(&head_ref).ok();
+    let ref_handler = RefHandler::new(repository);
+    let parent_commit = ref_handler.deref(head_ref).ok();
     Ok(create_commit_with_tree(
         root_tree.id_as_string(),
         parent_commit,
-        &repository,
+        repository,
     ))
 }
 
@@ -74,7 +74,7 @@ fn create_commit_with_tree<'a>(
 fn write_commit_status(commit: &Commit, writer: &mut dyn OutputWriter) -> io::Result<()> {
     let first_line = commit
         .message
-        .split("\n")
+        .split('\n')
         .next()
         .expect("Not a single line in the commit message");
 

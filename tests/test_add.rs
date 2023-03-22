@@ -2,8 +2,6 @@ use std::{fs, io, path::PathBuf};
 
 use rut::{add, index::Index};
 
-use rut_testhelpers;
-
 #[test]
 fn test_add_directory() -> io::Result<()> {
     // arrange
@@ -15,14 +13,14 @@ fn test_add_directory() -> io::Result<()> {
     let file_in_nested_dir = nested_dir.join("file.txt");
 
     fs::create_dir(&nested_dir)?;
-    fs::write(&readme, "A README.")?;
-    fs::write(&file_in_nested_dir, "A file.")?;
+    fs::write(readme, "A README.")?;
+    fs::write(file_in_nested_dir, "A file.")?;
 
     // act
-    rut_testhelpers::rut_add(&workdir, &repository);
+    rut_testhelpers::rut_add(workdir, &repository);
 
     // assert
-    let index = Index::from_file(&repository.git_dir().join("index"))?;
+    let index = Index::from_file(repository.git_dir().join("index"))?;
     let paths_in_index: Vec<&PathBuf> = index
         .get_entries()
         .iter()
@@ -31,7 +29,7 @@ fn test_add_directory() -> io::Result<()> {
 
     let expected_paths: Vec<PathBuf> = ["README.md", "nested/file.txt"]
         .iter()
-        .map(|path| PathBuf::from(path))
+        .map(PathBuf::from)
         .collect();
 
     assert_eq!(

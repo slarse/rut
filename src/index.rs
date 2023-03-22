@@ -32,7 +32,7 @@ fn to_be_u32(bytes: &[u8]) -> Result<u32, String> {
 
     let mut result: u32 = 0;
     for (index, byte) in bytes.iter().enumerate() {
-        result |= (*byte as u32) << (3 - index) * 8;
+        result |= (*byte as u32) << ((3 - index) * 8);
     }
 
     Ok(result)
@@ -45,7 +45,7 @@ fn to_be_u16(bytes: &[u8]) -> Result<u16, String> {
 
     let mut result: u16 = 0;
     for (index, byte) in bytes.iter().enumerate() {
-        result |= (*byte as u16) << (1 - index) * 8;
+        result |= (*byte as u16) << ((1 - index) * 8);
     }
     Ok(result)
 }
@@ -509,7 +509,7 @@ mod tests {
     #[test]
     fn test_as_vec() {
         let object_id = vec![1, 2];
-        let hexlified_object_id = hex::hexlify(&object_id).get(0).unwrap().to_owned();
+        let hexlified_object_id = hex::hexlify(&object_id).first().unwrap().to_owned();
         let entry = IndexEntry {
             ctime_seconds: 1657658046,
             ctime_nanoseconds: 444900053,

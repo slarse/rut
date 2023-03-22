@@ -154,7 +154,7 @@ mod tests {
         {
             let mut lockfile = LockFile::acquire(&file).expect("Failed to acquire lock");
             lockfile
-                .write(&mut new_file_content.as_bytes())
+                .write(new_file_content.as_bytes())
                 .expect("Failed to write to lockfile");
         }
 
@@ -178,7 +178,7 @@ mod tests {
         String::from(
             str::from_utf8(&output.stdout)
                 .expect("Failed to decode process output")
-                .trim_end_matches("\n"),
+                .trim_end_matches('\n'),
         )
     }
 }

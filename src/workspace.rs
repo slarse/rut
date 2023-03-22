@@ -43,7 +43,7 @@ impl Database {
         fs::create_dir_all(&dirpath)?;
 
         let compressed_bytes = Database::compress(&mut content)?;
-        let object_filepath = dirpath.join(&filename);
+        let object_filepath = dirpath.join(filename);
         if !object_filepath.exists() {
             file::atomic_write(&object_filepath, &compressed_bytes)?;
         }
@@ -73,7 +73,7 @@ impl Database {
         let object_type: Vec<u8> = data
             .iter()
             .map(|byte| byte.to_owned())
-            .take_while(|byte| byte != &(' ' as u8))
+            .take_while(|byte| byte != &b' ')
             .collect();
 
         let size_start = object_type.len() + 1;
@@ -93,7 +93,7 @@ impl Database {
         let tree_line = next_line(content);
         let author_or_parent_line = next_line(content);
 
-        let space = ' ' as u8;
+        let space = b' ';
         let is_not_space = |item: &u8| *item != space;
 
         let (parent_line, author_line) = {
@@ -143,18 +143,16 @@ impl Database {
     }
 
     fn parse_parent(&self, parent_line: Option<&Vec<u8>>) -> Option<String> {
-        parent_line
-            .map(|parent_line| {
-                let parent_oid_bytes: Vec<u8> = parent_line
-                    .iter()
-                    .map(|byte| byte.to_owned())
-                    .skip_while(|byte| *byte != (' ' as u8))
-                    .collect();
-                str::from_utf8(&parent_oid_bytes)
-                    .ok()
-                    .map(|parent| parent.trim().to_owned())
-            })
-            .flatten()
+        parent_line.and_then(|parent_line| {
+            let parent_oid_bytes: Vec<u8> = parent_line
+                .iter()
+                .map(|byte| byte.to_owned())
+                .skip_while(|byte| *byte != b' ')
+                .collect();
+            str::from_utf8(&parent_oid_bytes)
+                .ok()
+                .map(|parent| parent.trim().to_owned())
+        })
     }
 
     pub fn load_tree(&self, tree_id: &[u8]) -> io::Result<Tree> {
@@ -194,7 +192,7 @@ impl Database {
         accumulator: &mut Vec<(String, String)>,
     ) -> io::Result<()> {
         for tree_entry in tree.entries() {
-            let next_path = if base_path == "" {
+            let next_path = if base_path.is_empty() {
                 String::from(&tree_entry.name)
             } else {
                 format!("{}/{}", &base_path, &tree_entry.name)
@@ -243,7 +241,7 @@ fn parse_tree_entries(content: &mut impl Iterator<Item = u8>) -> Vec<TreeEntry> 
 }
 
 fn parse_tree_entry(content: &mut impl Iterator<Item = u8>) -> TreeEntry {
-    let mode_bytes = take_while(content, |byte: &u8| *byte != ' ' as u8);
+    let mode_bytes = take_while(content, |byte: &u8| *byte != b' ');
     let name_bytes = take_while(content, |byte| *byte != 0);
     let object_id = hex::unhexlify(&content.take(20).collect::<Vec<u8>>());
 
@@ -266,7 +264,7 @@ fn parse_tree_entry(content: &mut impl Iterator<Item = u8>) -> TreeEntry {
 }
 
 fn next_line(iter: &mut impl Iterator<Item = u8>) -> Vec<u8> {
-    let is_not_newline = |item: &u8| *item != ('\n' as u8);
+    let is_not_newline = |item: &u8| *item != b'\n';
     take_while(iter, is_not_newline)
 }
 
@@ -317,7 +315,7 @@ mod tests {
 
         let entry = TreeEntry {
             name: String::from("file.txt"),
-            object_id: hex::from_hex_string(&"097711d5840f84b87f5567843471e886f5733d9a").unwrap(),
+            object_id: hex::from_hex_string("097711d5840f84b87f5567843471e886f5733d9a").unwrap(),
             mode: FileMode::Regular,
         };
         let tree = Tree::new(vec![entry]);
@@ -341,17 +339,17 @@ mod tests {
 
         let regular_file_entry = TreeEntry {
             name: String::from("file.txt"),
-            object_id: hex::from_hex_string(&"097711d5840f84b87f5567843471e886f5733d9a").unwrap(),
+            object_id: hex::from_hex_string("097711d5840f84b87f5567843471e886f5733d9a").unwrap(),
             mode: FileMode::Regular,
         };
         let executable_file_entry = TreeEntry {
             name: String::from("other_file.txt"),
-            object_id: hex::from_hex_string(&"097711d5840f84b87f5567843471e886f5733d9a").unwrap(),
+            object_id: hex::from_hex_string("097711d5840f84b87f5567843471e886f5733d9a").unwrap(),
             mode: FileMode::Executable,
         };
         let dir_entry = TreeEntry {
             name: String::from("libs"),
-            object_id: hex::from_hex_string(&"a2db0a195a522272a018af06515a439bb5ec5ceb").unwrap(),
+            object_id: hex::from_hex_string("a2db0a195a522272a018af06515a439bb5ec5ceb").unwrap(),
             mode: FileMode::Directory,
         };
 
@@ -440,7 +438,7 @@ pub struct Repository {
 impl Repository {
     pub fn from_worktree_root<P: AsRef<Path>>(worktree_root: P) -> Repository {
         let database = Database::new(worktree_root.as_ref().join(".git"));
-        let worktree = Worktree::new(worktree_root.as_ref().to_owned());
+        let worktree = Worktree::new(worktree_root.as_ref());
         Repository { database, worktree }
     }
 
@@ -461,7 +459,7 @@ impl Repository {
 
     pub fn load_index_unlocked(&self) -> io::Result<Index> {
         let index_file_path = self.git_dir().join("index");
-        let index = Index::from_file(&index_file_path)?;
+        let index = Index::from_file(index_file_path)?;
         Ok(index)
     }
 
@@ -479,7 +477,7 @@ impl Repository {
 
     pub fn head(&self) -> io::Result<String> {
         let head_file = self.git_dir().join("HEAD");
-        let head_content = fs::read_to_string(&head_file)?;
+        let head_content = fs::read_to_string(head_file)?;
         let trimmed_head_content = head_content.trim();
         Ok(trimmed_head_content.trim_start_matches("ref: ").to_owned())
     }
