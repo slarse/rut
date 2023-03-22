@@ -26,7 +26,7 @@ enum Action {
     Add {
         path: String,
     },
-    Remove {
+    Rm {
         path: String,
     },
     Status {
@@ -58,7 +58,7 @@ pub fn run_command(args: Vec<String>) -> io::Result<()> {
         Action::Add { path } => {
             add::add(resolve_path(&path)?, &repository)?;
         }
-        Action::Remove { path } => {
+        Action::Rm { path } => {
             rm::rm(resolve_path(&path)?, &repository)?;
         }
         Action::Status { porcelain } => {
