@@ -5,14 +5,12 @@ use std::{
 };
 
 use crate::{
-    hex,
     index::{Index, IndexEntry},
     object_resolver::ObjectResolver,
     objects,
     objects::Blob,
     objects::GitObject,
     output::{Color, OutputWriter},
-    refs::RefHandler,
     status,
     workspace::Repository,
 };
@@ -48,13 +46,7 @@ fn diff_repository_cached(
         index.as_mut(),
     )?;
 
-    let head_commit_id = RefHandler::new(repository).head()?;
-    let head_commit = repository
-        .database
-        .load_commit(&hex::from_hex_string(&head_commit_id).unwrap())?;
-    let root_tree_id = hex::from_hex_string(&head_commit.tree).unwrap();
-
-    let mut object_cache = ObjectResolver::new(&root_tree_id, &repository.database);
+    let mut object_cache = ObjectResolver::from_head_commit(repository)?;
 
     for file in files_with_staged_changes {
         let relative_path = repository.worktree().relativize_path(file);

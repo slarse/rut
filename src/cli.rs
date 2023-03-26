@@ -1,9 +1,9 @@
 use std::fmt::Debug;
 use std::io::Error;
 
-use crate::diff;
 use crate::output::{Color, OutputWriter};
 use crate::{add, commit, init, rm, status, workspace::Repository};
+use crate::{diff, restore};
 use std::env;
 use std::io;
 use std::path::PathBuf;
@@ -36,6 +36,9 @@ enum Action {
     Diff {
         #[clap(long)]
         cached: bool,
+    },
+    Restore {
+        path: String,
     },
 }
 
@@ -77,6 +80,9 @@ pub fn run_command(args: Vec<String>) -> io::Result<()> {
                 .build()
                 .unwrap();
             diff::diff_repository(&repository, &diff_options, &mut writer)?;
+        }
+        Action::Restore { path } => {
+            restore::restore_worktree(resolve_path(&path)?, &repository)?;
         }
     }
 

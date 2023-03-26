@@ -20,7 +20,7 @@ pub fn read_file<P: AsRef<Path>>(path: P) -> io::Result<Vec<u8>> {
  * Atomically write to a file by first writing to a temporary file and then renaming it to the
  * target file.
  */
-pub fn atomic_write(path: &PathBuf, content: &[u8]) -> io::Result<()> {
+pub fn atomic_write(path: &Path, content: &[u8]) -> io::Result<()> {
     let mut buffer_file = PathBuf::from(path);
     let buffer_file_extension = format!(
         "{}.rut-tmp-buffer",

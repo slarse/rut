@@ -33,4 +33,6 @@ pub mod status;
 
 pub mod diff;
 
+pub mod restore;
+
 mod object_resolver;

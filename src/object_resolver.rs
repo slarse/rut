@@ -5,8 +5,10 @@ use std::{
 };
 
 use crate::{
+    hex,
     objects::{Blob, Tree},
-    workspace::Database,
+    refs::RefHandler,
+    workspace::{Database, Repository},
 };
 
 pub struct ObjectResolver<'a> {
@@ -16,8 +18,7 @@ pub struct ObjectResolver<'a> {
 }
 
 impl<'a> ObjectResolver<'a> {
-    pub fn new(root_tree_id: &'a [u8], database: &'a Database) -> Self {
-        let root_tree = database.load_tree(root_tree_id).unwrap();
+    pub fn new(root_tree: Tree, database: &'a Database) -> Self {
         let mut trees = HashMap::new();
         trees.insert(PathBuf::new(), root_tree);
         Self {
@@ -25,6 +26,17 @@ impl<'a> ObjectResolver<'a> {
             database,
             blobs: HashMap::new(),
         }
+    }
+
+    pub fn from_head_commit(repository: &'a Repository) -> io::Result<Self> {
+        let head_commit_id = RefHandler::new(repository).head()?;
+        let head_commit = repository
+            .database
+            .load_commit(&hex::from_hex_string(&head_commit_id).unwrap())?;
+        let root_tree_id = hex::from_hex_string(&head_commit.tree).unwrap();
+        let root_tree = repository.database.load_tree(&root_tree_id).unwrap();
+
+        Ok(ObjectResolver::new(root_tree, &repository.database))
     }
 
     /**

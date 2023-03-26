@@ -12,7 +12,7 @@ use std::{
 use rut::{
     add, commit, diff, init,
     output::{Color, OutputWriter},
-    rm, status,
+    restore, rm, status,
     workspace::Repository,
 };
 
@@ -130,6 +130,11 @@ pub fn rut_status(repository: &Repository, options: &status::Options) -> io::Res
     };
     status::status(repository, options, &mut output_writer)?;
     Ok(output_writer.output)
+}
+
+pub fn rut_restore(file: &Path, repository: &Repository) -> io::Result<()> {
+    restore::restore_worktree(file, repository)?;
+    Ok(())
 }
 
 pub fn rut_diff_default(repository: &Repository) -> io::Result<String> {
