@@ -1,6 +1,8 @@
 use std::path::Path;
 use std::{fmt::Display, str};
 
+use chrono::Local;
+
 use crate::hashing;
 use crate::hex;
 use crate::index::FileMode;
@@ -175,9 +177,8 @@ impl<'a> GitObject<'a> for Commit {
     }
 
     fn to_object_format(&self) -> Vec<u8> {
-        // TODO get timezone from system
-        let timezone = "+0200";
-        let author_with_timestamp = format!("{} {} {}", self.author, self.timestamp, timezone);
+        let offset = Local::now().format("%z").to_string();
+        let author_with_timestamp = format!("{} {} {}", self.author, self.timestamp, offset);
 
         let content = match &self.parent {
             Some(parent) => {

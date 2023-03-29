@@ -11,6 +11,7 @@ flate2 = "1.0"
 walkdir = "2"
 derive_builder = "0.12"
 clap = { version = "4.1.11", features = ["derive"] }
+chrono = "0.4.24"
 
 [dev-dependencies]
 rut_testhelpers = { path = "libs/rut_testhelpers" }
