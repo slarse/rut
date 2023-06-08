@@ -132,8 +132,8 @@ pub fn rut_status(repository: &Repository, options: &status::Options) -> io::Res
     Ok(output_writer.output)
 }
 
-pub fn rut_restore(file: &Path, repository: &Repository) -> io::Result<()> {
-    restore::restore_worktree(file, repository)?;
+pub fn rut_restore(file: &Path, options: &restore::Options, repository: &Repository) -> io::Result<()> {
+    restore::restore_worktree(file, options, repository)?;
     Ok(())
 }
 

@@ -20,7 +20,7 @@ struct Args {
 enum Action {
     Init,
     Commit {
-        #[clap(short, long)]
+        #[arg(short, long)]
         message: Option<String>,
     },
     Add {
@@ -30,15 +30,17 @@ enum Action {
         path: String,
     },
     Status {
-        #[clap(long)]
+        #[arg(long)]
         porcelain: bool,
     },
     Diff {
-        #[clap(long)]
+        #[arg(long)]
         cached: bool,
     },
     Restore {
         path: String,
+        #[arg(long, default_value = "HEAD")]
+        source: String,
     },
 }
 
@@ -81,8 +83,12 @@ pub fn run_command(args: Vec<String>) -> io::Result<()> {
                 .unwrap();
             diff::diff_repository(&repository, &diff_options, &mut writer)?;
         }
-        Action::Restore { path } => {
-            restore::restore_worktree(resolve_path(&path)?, &repository)?;
+        Action::Restore { path, source } => {
+            let options = restore::OptionsBuilder::default()
+                .source(source)
+                .build()
+                .unwrap();
+            restore::restore_worktree(resolve_path(&path)?, &options, &repository)?;
         }
     }
 
