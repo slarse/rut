@@ -56,10 +56,10 @@ pub fn create_commit<'a>(
     ))
 }
 
-fn create_commit_with_tree<'a>(
+fn create_commit_with_tree(
     tree: String,
     parent: Option<String>,
-    repository: &'a Repository,
+    repository: &Repository,
 ) -> Commit {
     let config = repository.config();
     let author = Author {

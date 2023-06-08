@@ -35,14 +35,14 @@ impl Database {
         git_object: &'a (impl GitObject<'a> + 'a),
     ) -> io::Result<PathBuf> {
         let object_id = git_object.id();
-        let mut content = git_object.to_object_format();
+        let content = git_object.to_object_format();
 
         let dirname = hex::to_hex_string(&object_id[..2]);
         let filename = hex::to_hex_string(&object_id[2..]);
         let dirpath = self.git_dir.join("objects").join(dirname);
         fs::create_dir_all(&dirpath)?;
 
-        let compressed_bytes = Database::compress(&mut content)?;
+        let compressed_bytes = Database::compress(&content)?;
         let object_filepath = dirpath.join(filename);
         if !object_filepath.exists() {
             file::atomic_write(&object_filepath, &compressed_bytes)?;
@@ -51,7 +51,7 @@ impl Database {
         Ok(object_filepath)
     }
 
-    fn compress(content: &mut Vec<u8>) -> io::Result<Vec<u8>> {
+    fn compress(content: &[u8]) -> io::Result<Vec<u8>> {
         let mut encoder = ZlibEncoder::new(Vec::new(), Compression::default());
         encoder.write_all(content)?;
         let compressed_bytes = encoder.finish()?;

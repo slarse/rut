@@ -54,6 +54,6 @@ fn commit_content(
     commit_message: &str,
 ) -> io::Result<String> {
     fs::write(file, content)?;
-    rut_testhelpers::rut_add(&file, repository);
+    rut_testhelpers::rut_add(file, repository);
     rut_testhelpers::rut_commit(commit_message, repository)
 }
