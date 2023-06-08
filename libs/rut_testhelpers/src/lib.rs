@@ -23,13 +23,21 @@ pub fn rut_commit_with_output_capture(
     let mut output_writer = CapturingOutputWriter {
         output: String::new(),
     };
-    commit::commit(&repository, Some(commit_message), &mut output_writer)?;
+    let options = commit::OptionsBuilder::default()
+        .message(Some(commit_message.to_owned()))
+        .build()
+        .unwrap();
+    commit::commit(&repository, &options, &mut output_writer)?;
     Ok(output_writer.output)
 }
 
 pub fn rut_commit(commit_message: &str, repository: &Repository) -> io::Result<String> {
     fs::write(&repository.git_dir().join("COMMIT_EDITMSG"), commit_message)?;
-    commit::commit(&repository, Some(commit_message), &mut NoopOutputWriter)?;
+    let options = commit::OptionsBuilder::default()
+        .message(Some(commit_message.to_owned()))
+        .build()
+        .unwrap();
+    commit::commit(&repository, &options, &mut NoopOutputWriter)?;
 
     // sleep a little to ensure that we get a strict "happens-after" relationship the commit
     // and anything that follows it
@@ -132,7 +140,11 @@ pub fn rut_status(repository: &Repository, options: &status::Options) -> io::Res
     Ok(output_writer.output)
 }
 
-pub fn rut_restore(file: &Path, options: &restore::Options, repository: &Repository) -> io::Result<()> {
+pub fn rut_restore(
+    file: &Path,
+    options: &restore::Options,
+    repository: &Repository,
+) -> io::Result<()> {
     restore::restore_worktree(file, options, repository)?;
     Ok(())
 }

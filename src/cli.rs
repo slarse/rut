@@ -58,7 +58,11 @@ pub fn run_command(args: Vec<String>) -> io::Result<()> {
             init::init(&git_dir, &mut writer)?;
         }
         Action::Commit { message } => {
-            commit::commit(&repository, message.as_deref(), &mut writer)?;
+            let options = commit::OptionsBuilder::default()
+                .message(message)
+                .build()
+                .unwrap();
+            commit::commit(&repository, &options, &mut writer)?;
         }
         Action::Add { path } => {
             add::add(resolve_path(&path)?, &repository)?;

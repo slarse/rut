@@ -10,12 +10,17 @@ use crate::output::OutputWriter;
 use crate::refs::RefHandler;
 use crate::workspace::Repository;
 
+#[derive(Default, Builder, Debug)]
+pub struct Options {
+    pub message: Option<String>,
+}
+
 pub fn commit(
     repository: &Repository,
-    message: Option<&str>,
+    options: &Options,
     writer: &mut dyn OutputWriter,
 ) -> io::Result<()> {
-    if let Some(message) = message {
+    if let Some(message) = &options.message {
         fs::write(repository.git_dir().join("COMMIT_EDITMSG"), message)?;
     }
     let mut index = repository.load_index()?;
