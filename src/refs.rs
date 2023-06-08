@@ -20,6 +20,10 @@ impl<'a> RefHandler<'a> {
      * Dereference a Git ref.
      */
     pub fn deref(&self, reference: &str) -> io::Result<String> {
+        if reference == "HEAD" {
+            return self.head();
+        }
+
         let trimmed_reference = reference.trim().trim_start_matches("refs/heads/");
         let ref_file = self
             .repository
