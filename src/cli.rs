@@ -71,21 +71,21 @@ pub fn run_command(args: Vec<String>) -> io::Result<()> {
             rm::rm(resolve_path(&path)?, &repository)?;
         }
         Action::Status { porcelain } => {
-            let status_options = status::Options {
+            let options = status::Options {
                 output_format: if porcelain {
                     status::OutputFormat::Porcelain
                 } else {
                     status::OutputFormat::HumanReadable
                 },
             };
-            status::status(&repository, &status_options, &mut writer)?;
+            status::status(&repository, &options, &mut writer)?;
         }
         Action::Diff { cached } => {
-            let diff_options = diff::OptionsBuilder::default()
+            let options = diff::OptionsBuilder::default()
                 .cached(cached)
                 .build()
                 .unwrap();
-            diff::diff_repository(&repository, &diff_options, &mut writer)?;
+            diff::diff_repository(&repository, &options, &mut writer)?;
         }
         Action::Restore { path, source } => {
             let options = restore::OptionsBuilder::default()
