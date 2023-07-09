@@ -3,7 +3,8 @@ use std::io;
 use chrono::{DateTime, Local};
 
 use crate::hex;
-use crate::output::{OutputWriter, Color, Style};
+use crate::objects::{Commit, GitObject};
+use crate::output::{Color, OutputWriter, Style};
 use crate::refs::RefHandler;
 use crate::workspace::Repository;
 
@@ -13,28 +14,53 @@ pub fn log(repository: &Repository, writer: &mut dyn OutputWriter) -> io::Result
     let head_commit_id_hex = &hex::from_hex_string(&head_commit_id).unwrap();
     let head_commit = repository.database.load_commit(head_commit_id_hex)?;
 
+    write_log_message(&head_commit, Some("main"), writer)?;
+
+    let mut commit = head_commit;
+    while commit.parent.is_some() {
+        commit = repository
+            .database
+            .load_commit(&hex::from_hex_string(&commit.parent.unwrap()).unwrap())?;
+        write_log_message(&commit, None, writer)?;
+    }
+
+    Ok(())
+}
+
+fn write_log_message(
+    commit: &Commit,
+    branch: Option<&str>,
+    writer: &mut dyn OutputWriter,
+) -> io::Result<()> {
     let timestamp_parse_error = io::Error::new(io::ErrorKind::Other, "Failed to parse timestamp");
 
-    writer.set_color(Color::Brown)?
-        .write(format!("commit {} (", head_commit_id))?
-        .set_color(Color::Cyan)?
-        .set_style(Style::Bold)?
-        .write("HEAD -> ".to_string())?
-        .set_color(Color::Green)?
-        .write("main".to_string())?
+    writer
         .set_color(Color::Brown)?
-        .set_style(Style::Normal)?
-        .writeln(")".to_string())?
-        .reset_formatting()?
-        .writeln(format!("Author: {}
+        .write(format!("commit {}", commit.id_as_string()))?;
+
+    if let Some(branch) = branch {
+        writer
+            .write(" (".to_string())?
+            .set_color(Color::Cyan)?
+            .set_style(Style::Bold)?
+            .write("HEAD -> ".to_string())?
+            .set_color(Color::Green)?
+            .write(branch.to_string())?
+            .set_color(Color::Brown)?
+            .set_style(Style::Normal)?
+            .write(")".to_string())?;
+    }
+
+    writer.reset_formatting()?.writeln(format!(
+        "
+Author: {}
 Date:   {}
 
     {}",
-        head_commit.author,
-        to_local_timestring(head_commit.timestamp).ok_or(timestamp_parse_error)?,
-        head_commit.message
+        commit.author,
+        to_local_timestring(commit.timestamp).ok_or(timestamp_parse_error)?,
+        commit.message
     ))?;
-        
     Ok(())
 }
 
