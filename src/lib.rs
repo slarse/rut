@@ -35,4 +35,6 @@ pub mod diff;
 
 pub mod restore;
 
+pub mod log;
+
 mod object_resolver;

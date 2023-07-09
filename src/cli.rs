@@ -2,7 +2,7 @@ use std::fmt::Debug;
 use std::io::Error;
 
 use crate::output::{Color, OutputWriter};
-use crate::{add, commit, init, rm, status, workspace::Repository};
+use crate::{add, commit, init, rm, status, workspace::Repository, log};
 use crate::{diff, restore};
 use std::env;
 use std::io;
@@ -42,6 +42,7 @@ enum Action {
         #[arg(long, default_value = "HEAD")]
         source: String,
     },
+    Log,
 }
 
 pub fn run_command(args: Vec<String>) -> io::Result<()> {
@@ -94,6 +95,9 @@ pub fn run_command(args: Vec<String>) -> io::Result<()> {
                 .unwrap();
             restore::restore_worktree(resolve_path(&path)?, &options, &repository)?;
         }
+        Action::Log => {
+            log::log(&repository, &mut writer)?;
+        }
     }
 
     Ok(())
@@ -112,6 +116,7 @@ impl OutputWriter for StdoutWriter {
             Color::Red => "31",
             Color::Green => "32",
             Color::Cyan => "36",
+            Color::Brown => "38;5;130",
         };
         print!("\x1b[{}m", ansi_code);
         Ok(self)

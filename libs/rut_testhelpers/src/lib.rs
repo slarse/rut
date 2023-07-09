@@ -10,7 +10,7 @@ use std::{
 };
 
 use rut::{
-    add, commit, diff, init,
+    add, commit, diff, init, log,
     output::{Color, OutputWriter},
     restore, rm, status,
     workspace::Repository,
@@ -196,4 +196,23 @@ pub fn assert_file_contains(path: &PathBuf, expected_content: &str) {
     let actual_content = str::from_utf8(&bytes).ok().unwrap();
 
     assert_eq!(actual_content, expected_content);
+}
+
+pub fn commit_content(
+    repository: &Repository,
+    file: &Path,
+    content: &str,
+    commit_message: &str,
+) -> io::Result<String> {
+    fs::write(file, content)?;
+    rut_add(file, repository);
+    rut_commit(commit_message, repository)
+}
+
+pub fn rut_log(repository: &Repository) -> io::Result<String> {
+    let mut output_writer = CapturingOutputWriter {
+        output: String::new(),
+    };
+    log::log(repository, &mut output_writer)?;
+    Ok(output_writer.output)
 }
