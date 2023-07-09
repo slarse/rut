@@ -1,8 +1,8 @@
 use std::fmt::Debug;
 use std::io::Error;
 
-use crate::output::{Color, OutputWriter};
-use crate::{add, commit, init, rm, status, workspace::Repository, log};
+use crate::output::{Color, OutputWriter, Style};
+use crate::{add, commit, init, log, rm, status, workspace::Repository};
 use crate::{diff, restore};
 use std::env;
 use std::io;
@@ -118,7 +118,16 @@ impl OutputWriter for StdoutWriter {
             Color::Cyan => "36",
             Color::Brown => "38;5;130",
         };
-        print!("\x1b[{}m", ansi_code);
+        print_ansi_code(ansi_code);
+        Ok(self)
+    }
+
+    fn set_style(&mut self, style: Style) -> io::Result<&mut dyn OutputWriter> {
+        let ansi_code = match style {
+            Style::Bold => "1",
+            Style::Normal => "22",
+        };
+        print_ansi_code(ansi_code);
         Ok(self)
     }
 
@@ -126,6 +135,10 @@ impl OutputWriter for StdoutWriter {
         print!("\x1b[0m");
         Ok(self)
     }
+}
+
+fn print_ansi_code(ansi_code: &str) {
+    print!("\x1b[{}m", ansi_code);
 }
 
 fn resolve_path(path: &str) -> io::Result<PathBuf> {

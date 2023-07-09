@@ -86,6 +86,10 @@ impl OutputWriter for CapturingOutputWriter {
         Ok(self)
     }
 
+    fn set_style(&mut self, _style: Style) -> io::Result<&mut dyn OutputWriter> {
+        Ok(self)
+    }
+
     fn reset_formatting(&mut self) -> io::Result<&mut dyn OutputWriter> {
         Ok(self)
     }

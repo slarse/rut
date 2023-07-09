@@ -29,6 +29,11 @@ pub trait OutputWriter {
     fn set_color(&mut self, color: Color) -> io::Result<&mut dyn OutputWriter>;
 
     /**
+     * Change the style of the output.
+     */
+    fn set_style(&mut self, stye: Style) -> io::Result<&mut dyn OutputWriter>;
+
+    /**
      * Reset all output formatting.
      */
     fn reset_formatting(&mut self) -> io::Result<&mut dyn OutputWriter>;
@@ -41,4 +46,13 @@ pub enum Color {
     Red,
     Green,
     Cyan,
+    Brown,
+}
+
+/**
+ * A style used by an OutputWriter.
+ */
+pub enum Style {
+    Bold,
+    Normal,
 }
