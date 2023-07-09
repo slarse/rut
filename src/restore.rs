@@ -25,7 +25,11 @@ pub struct Options {
 ///
 /// * `io::Result<()>`: A result indicating success or failure. In case of success, the
 ///   working directory file is overwritten with the content from the latest commit.
-pub fn restore_worktree<P: AsRef<Path>>(file: P, options: &Options, repository: &Repository) -> io::Result<()> {
+pub fn restore_worktree<P: AsRef<Path>>(
+    file: P,
+    options: &Options,
+    repository: &Repository,
+) -> io::Result<()> {
     let mut object_cache = ObjectResolver::from_reference(&options.source, repository)?;
 
     let absolute_path = repository.worktree().root().join(file.as_ref());
