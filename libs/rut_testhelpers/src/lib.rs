@@ -11,7 +11,7 @@ use std::{
 
 use rut::{
     add, commit, diff, init, log,
-    output::{Color, OutputWriter},
+    output::{Color, Style, OutputWriter},
     restore, rm, status,
     workspace::Repository,
 };
@@ -103,6 +103,10 @@ impl OutputWriter for NoopOutputWriter {
     }
 
     fn set_color(&mut self, _: Color) -> io::Result<&mut dyn OutputWriter> {
+        Ok(self)
+    }
+
+    fn set_style(&mut self, _: Style) -> io::Result<&mut dyn OutputWriter> {
         Ok(self)
     }
 
