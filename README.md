@@ -69,6 +69,8 @@ Rut currently supports the following subset of Git:
 * `restore`
     - Restores a single file in the worktree
     - Accepts the `--source` option that takes a reference (defaults to HEAD)
+* `log`
+    - Shows the Git log starting from HEAD
 
 ## Upcoming features
 
