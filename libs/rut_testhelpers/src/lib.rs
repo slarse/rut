@@ -217,10 +217,15 @@ pub fn commit_content(
     rut_commit(commit_message, repository)
 }
 
-pub fn rut_log(repository: &Repository) -> io::Result<String> {
+pub fn rut_log_default(repository: &Repository) -> io::Result<String> {
+    let options = log::OptionsBuilder::default().build().ok().unwrap();
+    rut_log(repository, &options)
+}
+
+pub fn rut_log(repository: &Repository, options: &log::Options) -> io::Result<String> {
     let mut output_writer = CapturingOutputWriter {
         output: String::new(),
     };
-    log::log(repository, &mut output_writer)?;
+    log::log(repository, options, &mut output_writer)?;
     Ok(output_writer.output)
 }

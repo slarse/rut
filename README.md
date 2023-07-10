@@ -71,6 +71,7 @@ Rut currently supports the following subset of Git:
     - Accepts the `--source` option that takes a reference (defaults to HEAD)
 * `log`
     - Shows the Git log starting from HEAD
+    - Accepts the `-n <number>` option to limit the amount of logged commits
 
 ## Upcoming features
 

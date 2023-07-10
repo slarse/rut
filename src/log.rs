@@ -8,7 +8,17 @@ use crate::output::{Color, OutputWriter, Style};
 use crate::refs::RefHandler;
 use crate::workspace::Repository;
 
-pub fn log(repository: &Repository, writer: &mut dyn OutputWriter) -> io::Result<()> {
+#[derive(Default, Builder, Debug)]
+pub struct Options {
+    #[builder(default)]
+    pub max_count: Option<u32>,
+}
+
+pub fn log(
+    repository: &Repository,
+    options: &Options,
+    writer: &mut dyn OutputWriter,
+) -> io::Result<()> {
     let refs = RefHandler::new(repository);
     let head_commit_id = refs.head()?;
     let head_commit_id_hex = &hex::from_hex_string(&head_commit_id).unwrap();
@@ -16,12 +26,16 @@ pub fn log(repository: &Repository, writer: &mut dyn OutputWriter) -> io::Result
 
     write_log_message(&head_commit, Some("main"), writer)?;
 
+    let mut num_written_commits = 1;
+    let max_count = options.max_count.unwrap_or(u32::MAX);
+
     let mut commit = head_commit;
-    while commit.parent.is_some() {
+    while commit.parent.is_some() && num_written_commits < max_count {
         commit = repository
             .database
             .load_commit(&hex::from_hex_string(&commit.parent.unwrap()).unwrap())?;
         write_log_message(&commit, None, writer)?;
+        num_written_commits += 1;
     }
 
     Ok(())

@@ -42,7 +42,10 @@ enum Action {
         #[arg(long, default_value = "HEAD")]
         source: String,
     },
-    Log,
+    Log {
+        #[arg(short = 'n', long)]
+        max_count: Option<u32>,
+    },
 }
 
 pub fn run_command(args: Vec<String>) -> io::Result<()> {
@@ -95,8 +98,12 @@ pub fn run_command(args: Vec<String>) -> io::Result<()> {
                 .unwrap();
             restore::restore_worktree(resolve_path(&path)?, &options, &repository)?;
         }
-        Action::Log => {
-            log::log(&repository, &mut writer)?;
+        Action::Log { max_count } => {
+            let options = log::OptionsBuilder::default()
+                .max_count(max_count)
+                .build()
+                .unwrap();
+            log::log(&repository, &options, &mut writer)?;
         }
     }
 

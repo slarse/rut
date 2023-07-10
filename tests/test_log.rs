@@ -12,7 +12,7 @@ fn test_log() -> io::Result<()> {
     let commit_id = rut_testhelpers::commit_content(&repository, &file, "content", "First commit")?;
 
     // act
-    let output = rut_testhelpers::rut_log(&repository)?;
+    let output = rut_testhelpers::rut_log_default(&repository)?;
 
     // assert
     let commit = repository
@@ -45,11 +45,35 @@ fn test_log_two_commits() -> io::Result<()> {
         rut_testhelpers::commit_content(&repository, &file, "more content", "Second commit")?;
 
     // act
-    let output = rut_testhelpers::rut_log(&repository)?;
+    let output = rut_testhelpers::rut_log_default(&repository)?;
 
     // assert
     assert!(output.contains(&first_commit_id));
     assert!(output.contains(&second_commit_id));
 
+    Ok(())
+}
+
+#[test]
+fn test_log_two_commits_with_max_count_1() -> io::Result<()> {
+    // arrange
+    let repository = rut_testhelpers::create_repository();
+
+    let file = repository.worktree().root().join("file.txt");
+    let first_commit_id =
+        rut_testhelpers::commit_content(&repository, &file, "content", "First commit")?;
+    let second_commit_id =
+        rut_testhelpers::commit_content(&repository, &file, "more content", "Second commit")?;
+
+    // act
+    let options = log::OptionsBuilder::default()
+        .max_count(Some(1))
+        .build()
+        .unwrap();
+    let output = rut_testhelpers::rut_log(&repository, &options)?;
+
+    // assert
+    assert!(output.contains(&second_commit_id));
+    assert!(!output.contains(&first_commit_id));
     Ok(())
 }
