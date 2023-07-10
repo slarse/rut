@@ -1,7 +1,6 @@
-use std::{fs, io, path::Path};
+use std::{fs, io};
 
 use rut::restore;
-use rut::workspace::Repository;
 
 #[test]
 fn test_restores_unstaged_file_to_last_commit() -> io::Result<()> {
