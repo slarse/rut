@@ -3,6 +3,8 @@ use std::io;
 use rut::hex;
 use rut::log;
 
+use rut::objects::{GitObject, Commit};
+
 #[test]
 fn test_log() -> io::Result<()> {
     // arrange
@@ -75,5 +77,45 @@ fn test_log_two_commits_with_max_count_1() -> io::Result<()> {
     // assert
     assert!(output.contains(&second_commit_id));
     assert!(!output.contains(&first_commit_id));
+    Ok(())
+}
+
+#[test]
+fn test_log_two_commits_with_oneline_formatting() -> io::Result<()> {
+    // arrange
+    let repository = rut_testhelpers::create_repository();
+
+    let file = repository.worktree().root().join("file.txt");
+    let first_commit_id =
+        rut_testhelpers::commit_content(&repository, &file, "content", "First commit")?;
+    let second_commit_id =
+        rut_testhelpers::commit_content(&repository, &file, "more content", "Second commit")?;
+
+    // act
+    let options = log::OptionsBuilder::default()
+        .format(log::Format::Oneline)
+        .build()
+        .unwrap();
+    let output = rut_testhelpers::rut_log(&repository, &options)?;
+
+    // assert
+    let first_commit: Commit = repository
+        .database
+        .load_commit(&hex::from_hex_string(&first_commit_id).unwrap())?;
+    let second_commit: Commit = repository
+        .database
+        .load_commit(&hex::from_hex_string(&second_commit_id).unwrap())?;
+
+    assert_eq!(
+        output,
+        format!(
+            "{} (HEAD -> main) {}\n{} {}\n",
+            second_commit.short_id_as_string(),
+            second_commit.message,
+            first_commit.short_id_as_string(),
+            first_commit.message
+        ),
+    );
+
     Ok(())
 }

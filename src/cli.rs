@@ -45,6 +45,8 @@ enum Action {
     Log {
         #[arg(short = 'n', long)]
         max_count: Option<u32>,
+        #[arg(long)]
+        oneline: bool,
     },
 }
 
@@ -98,9 +100,16 @@ pub fn run_command(args: Vec<String>) -> io::Result<()> {
                 .unwrap();
             restore::restore_worktree(resolve_path(&path)?, &options, &repository)?;
         }
-        Action::Log { max_count } => {
+        Action::Log { max_count, oneline } => {
+            let format = if oneline {
+                log::Format::Oneline
+            } else {
+                log::Format::Default
+            };
+
             let options = log::OptionsBuilder::default()
                 .max_count(max_count)
+                .format(format)
                 .build()
                 .unwrap();
             log::log(&repository, &options, &mut writer)?;

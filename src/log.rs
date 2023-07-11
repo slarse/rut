@@ -8,10 +8,25 @@ use crate::output::{Color, OutputWriter, Style};
 use crate::refs::RefHandler;
 use crate::workspace::Repository;
 
+#[derive(Debug, Clone)]
+pub enum Format {
+    Oneline,
+    Default,
+}
+
+impl Default for Format {
+    fn default() -> Self {
+        Format::Default
+    }
+}
+
 #[derive(Default, Builder, Debug)]
 pub struct Options {
     #[builder(default)]
     pub max_count: Option<u32>,
+
+    #[builder(default)]
+    pub format: Format,
 }
 
 pub fn log(
@@ -24,7 +39,12 @@ pub fn log(
     let head_commit_id_hex = &hex::from_hex_string(&head_commit_id).unwrap();
     let head_commit = repository.database.load_commit(head_commit_id_hex)?;
 
-    write_log_message(&head_commit, Some("main"), writer)?;
+    let write_log = match options.format {
+        Format::Oneline => write_log_message_oneline,
+        Format::Default => write_log_message,
+    };
+
+    write_log(&head_commit, Some("main"), writer)?;
 
     let mut num_written_commits = 1;
     let max_count = options.max_count.unwrap_or(u32::MAX);
@@ -34,10 +54,29 @@ pub fn log(
         commit = repository
             .database
             .load_commit(&hex::from_hex_string(&commit.parent.unwrap()).unwrap())?;
-        write_log_message(&commit, None, writer)?;
+        write_log(&commit, None, writer)?;
         num_written_commits += 1;
     }
 
+    Ok(())
+}
+
+fn write_log_message_oneline(
+    commit: &Commit,
+    branch: Option<&str>,
+    writer: &mut dyn OutputWriter,
+) -> io::Result<()> {
+    writer
+        .set_color(Color::Brown)?
+        .write(commit.short_id_as_string())?;
+
+    if let Some(branch) = branch {
+        write_branch(branch, writer)?
+    }
+
+    writer
+        .reset_formatting()?
+        .writeln(format!(" {}", commit.message))?;
     Ok(())
 }
 
@@ -53,16 +92,7 @@ fn write_log_message(
         .write(format!("commit {}", commit.id_as_string()))?;
 
     if let Some(branch) = branch {
-        writer
-            .write(" (".to_string())?
-            .set_color(Color::Cyan)?
-            .set_style(Style::Bold)?
-            .write("HEAD -> ".to_string())?
-            .set_color(Color::Green)?
-            .write(branch.to_string())?
-            .set_color(Color::Brown)?
-            .set_style(Style::Normal)?
-            .write(")".to_string())?;
+        write_branch(branch, writer)?
     }
 
     writer.reset_formatting()?.writeln(format!(
@@ -75,6 +105,20 @@ Date:   {}
         to_local_timestring(commit.timestamp).ok_or(timestamp_parse_error)?,
         commit.message
     ))?;
+    Ok(())
+}
+
+fn write_branch(branch: &str, writer: &mut dyn OutputWriter) -> io::Result<()> {
+    writer
+        .write(" (".to_string())?
+        .set_color(Color::Cyan)?
+        .set_style(Style::Bold)?
+        .write("HEAD -> ".to_string())?
+        .set_color(Color::Green)?
+        .write(branch.to_string())?
+        .set_color(Color::Brown)?
+        .set_style(Style::Normal)?
+        .write(")".to_string())?;
     Ok(())
 }
 
