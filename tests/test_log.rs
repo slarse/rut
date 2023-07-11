@@ -3,7 +3,7 @@ use std::io;
 use rut::hex;
 use rut::log;
 
-use rut::objects::{Commit, GitObject};
+use rut::objects::GitObject;
 
 #[test]
 fn test_log() -> io::Result<()> {
@@ -87,9 +87,13 @@ fn test_log_two_commits_with_oneline_formatting() -> io::Result<()> {
 
     let file = repository.worktree().root().join("file.txt");
     let first_commit_id =
-        rut_testhelpers::commit_content(&repository, &file, "content", "First commit")?;
-    let second_commit_id =
-        rut_testhelpers::commit_content(&repository, &file, "more content", "Second commit")?;
+        rut_testhelpers::commit_content(&repository, &file, "content", "First commit\nwith body")?;
+    let second_commit_id = rut_testhelpers::commit_content(
+        &repository,
+        &file,
+        "more content",
+        "Second commit\nwith body",
+    )?;
 
     // act
     let options = log::OptionsBuilder::default()
@@ -99,10 +103,10 @@ fn test_log_two_commits_with_oneline_formatting() -> io::Result<()> {
     let output = rut_testhelpers::rut_log(&repository, &options)?;
 
     // assert
-    let first_commit: Commit = repository
+    let first_commit = repository
         .database
         .load_commit(&hex::from_hex_string(&first_commit_id).unwrap())?;
-    let second_commit: Commit = repository
+    let second_commit = repository
         .database
         .load_commit(&hex::from_hex_string(&second_commit_id).unwrap())?;
 
@@ -111,9 +115,9 @@ fn test_log_two_commits_with_oneline_formatting() -> io::Result<()> {
         format!(
             "{} (HEAD -> main) {}\n{} {}\n",
             second_commit.short_id_as_string(),
-            second_commit.message,
+            second_commit.message.lines().next().unwrap(),
             first_commit.short_id_as_string(),
-            first_commit.message
+            first_commit.message.lines().next().unwrap(),
         ),
     );
 

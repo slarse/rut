@@ -74,9 +74,10 @@ fn write_log_message_oneline(
         write_branch(branch, writer)?
     }
 
+    let first_line_of_message = commit.message.lines().next().unwrap();
     writer
         .reset_formatting()?
-        .writeln(format!(" {}", commit.message))?;
+        .writeln(format!(" {}", first_line_of_message))?;
     Ok(())
 }
 
