@@ -3,7 +3,7 @@ use std::io;
 use rut::hex;
 use rut::log;
 
-use rut::objects::{GitObject, Commit};
+use rut::objects::{Commit, GitObject};
 
 #[test]
 fn test_log() -> io::Result<()> {
