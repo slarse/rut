@@ -11,6 +11,7 @@ use crate::file;
 use crate::file::AsVec;
 use crate::hashing;
 use crate::hex;
+use crate::objects::ObjectId;
 
 const SIGNATURE: &str = "DIRC";
 const VERSION: [u8; 4] = [0, 0, 0, 2];
@@ -113,7 +114,8 @@ impl Index {
         position += BYTES_PER_U32;
         let file_size = to_be_u32(&bytes[position..(position + BYTES_PER_U32)])?;
         position += BYTES_PER_U32;
-        let object_id = hex::unhexlify(&bytes[position..(position + BYTES_PER_PACKED_OID)]);
+        let raw_object_id = hex::unhexlify(&bytes[position..(position + BYTES_PER_PACKED_OID)]);
+        let object_id = ObjectId::from_bytes(&raw_object_id)?;
         position += BYTES_PER_PACKED_OID;
 
         let path_size = to_be_u16(&bytes[position..(position + BYTES_PER_U16)])? as usize;
@@ -294,11 +296,11 @@ pub struct IndexEntry {
     pub gid: u32,
     pub file_size: u32,
     pub path: PathBuf,
-    pub object_id: Vec<u8>,
+    pub object_id: ObjectId,
 }
 
 impl IndexEntry {
-    pub fn new<P: AsRef<Path>>(path: P, object_id: Vec<u8>, metadata: &Metadata) -> IndexEntry {
+    pub fn new<P: AsRef<Path>>(path: P, object_id: ObjectId, metadata: &Metadata) -> IndexEntry {
         let ctime_seconds = metadata.st_ctime() as u32;
         let ctime_nanoseconds = metadata.st_ctime_nsec() as u32;
         let mtime_seconds = metadata.st_mtime() as u32;
@@ -339,7 +341,7 @@ impl IndexEntry {
         add_all(self.uid, &mut bytes);
         add_all(self.gid, &mut bytes);
         add_all(self.file_size, &mut bytes);
-        hex::hexlify(&self.object_id)
+        hex::hexlify(self.object_id.bytes())
             .into_iter()
             .for_each(|byte| bytes.push(byte));
 
@@ -508,8 +510,9 @@ mod tests {
 
     #[test]
     fn test_as_vec() {
-        let object_id = vec![1, 2];
-        let hexlified_object_id = hex::hexlify(&object_id).first().unwrap().to_owned();
+        let bytes: Vec<u8> = (0..10).cycle().map(|i| i as u8).take(40).collect();
+        let object_id = ObjectId::from_bytes(&bytes).unwrap();
+        let hexlified_object_id = hex::hexlify(object_id.bytes());
         let entry = IndexEntry {
             ctime_seconds: 1657658046,
             ctime_nanoseconds: 444900053,
@@ -525,70 +528,21 @@ mod tests {
             object_id,
         };
 
-        let expected_vec: Vec<u8> = vec![
-            98,
-            205,
-            218,
-            190,
-            26,
-            132,
-            162,
-            213,
-            98,
-            205,
-            218,
-            190,
-            26,
-            132,
-            162,
-            213,
-            0,
-            0,
-            254,
-            2,
-            0,
-            58,
-            117,
-            220,
-            0,
-            0,
-            129,
-            164,
-            0,
-            0,
-            3,
-            232,
-            0,
-            0,
-            3,
-            217,
-            0,
-            0,
-            1,
-            6,
-            hexlified_object_id,
-            0,
-            10,
-            67,
-            97,
-            114,
-            103,
-            111,
-            46,
-            116,
-            111,
-            109,
-            108,
-            0,
-            0,
-            0,
+        let mut expected_vec: Vec<u8> = vec![
+            98, 205, 218, 190, 26, 132, 162, 213, 98, 205, 218, 190, 26, 132, 162, 213, 0, 0, 254,
+            2, 0, 58, 117, 220, 0, 0, 129, 164, 0, 0, 3, 232, 0, 0, 3, 217, 0, 0, 1, 6,
         ];
+        expected_vec.extend_from_slice(&hexlified_object_id);
+        expected_vec.extend(vec![
+            0, 10, 67, 97, 114, 103, 111, 46, 116, 111, 109, 108, 0, 0, 0, 0, 0, 0, 0, 0
+        ]);
 
         assert_vectors_equal(&entry.as_vec(), &expected_vec);
     }
 
     fn create_entry(path: &str) -> IndexEntry {
-        let object_id: Vec<u8> = (0..10).cycle().take(40).collect();
+        let bytes: Vec<u8> = (0..10).cycle().map(|i| i as u8).take(40).collect();
+        let object_id = ObjectId::from_bytes(&bytes).unwrap();
         IndexEntry {
             ctime_seconds: 1657658046,
             ctime_nanoseconds: 444900053,

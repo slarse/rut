@@ -5,7 +5,7 @@ use std::{fs, io, path::PathBuf};
 
 use crate::hex::to_hex_string;
 use crate::index::{FileMode, Index, IndexEntry};
-use crate::objects::{Author, Commit, GitObject, Tree, TreeEntry};
+use crate::objects::{Author, Commit, GitObject, Tree, TreeEntry, ObjectId};
 use crate::output::OutputWriter;
 use crate::refs::RefHandler;
 use crate::workspace::Repository;
@@ -50,15 +50,15 @@ pub fn create_commit<'a>(
     let ref_handler = RefHandler::new(repository);
     let parent_commit = ref_handler.deref(head_ref).ok();
     Ok(create_commit_with_tree(
-        root_tree.id_as_string(),
+        root_tree.id(),
         parent_commit,
         repository,
     ))
 }
 
 fn create_commit_with_tree(
-    tree: String,
-    parent: Option<String>,
+    tree: &ObjectId,
+    parent: Option<ObjectId>,
     repository: &Repository,
 ) -> Commit {
     let config = repository.config();
@@ -74,13 +74,13 @@ fn create_commit_with_tree(
         .unwrap()
         .as_secs();
 
-    Commit {
-        tree,
+    Commit::new(
+        tree.clone(),
         author,
         message,
         parent,
         timestamp,
-    }
+    )
 }
 
 fn write_commit_status(commit: &Commit, writer: &mut dyn OutputWriter) -> io::Result<()> {
@@ -105,7 +105,7 @@ fn write_commit_status(commit: &Commit, writer: &mut dyn OutputWriter) -> io::Re
 fn build_tree(entries: &[&IndexEntry]) -> (Tree, Vec<Tree>) {
     let tmp_entries = entries.iter().map(|entry| TmpEntry {
         path: PathBuf::from(&entry.path),
-        object_id: entry.object_id[..].to_vec(),
+        object_id: &entry.object_id,
         file_mode: entry.file_mode(),
     });
 
@@ -113,13 +113,13 @@ fn build_tree(entries: &[&IndexEntry]) -> (Tree, Vec<Tree>) {
 }
 
 #[derive(Debug)]
-struct TmpEntry {
+struct TmpEntry <'a> {
     path: PathBuf,
-    object_id: Vec<u8>,
+    object_id: &'a ObjectId,
     file_mode: FileMode,
 }
 
-fn build_tree_from_tmp_entries(entries: impl Iterator<Item = TmpEntry>) -> (Tree, Vec<Tree>) {
+fn build_tree_from_tmp_entries<'a>(entries: impl Iterator<Item = TmpEntry<'a>>) -> (Tree, Vec<Tree>) {
     let mut entry_iter = entries.peekable();
     let mut tree_entries = Vec::new();
 
@@ -127,7 +127,7 @@ fn build_tree_from_tmp_entries(entries: impl Iterator<Item = TmpEntry>) -> (Tree
 
     while let Some(entry) = entry_iter.next() {
         let tree_entry = if entry.path.parent() == Some(&PathBuf::from("")) {
-            TreeEntry::new(&entry.path, entry.object_id, entry.file_mode)
+            TreeEntry::new(&entry.path, entry.object_id.clone(), entry.file_mode)
         } else {
             let prefix = entry.path.components().next().unwrap();
             let mut entries_for_tree = vec![TmpEntry {
@@ -144,7 +144,6 @@ fn build_tree_from_tmp_entries(entries: impl Iterator<Item = TmpEntry>) -> (Tree
                 .iter()
                 .map(|entry| {
                     let mut path = PathBuf::new();
-                    let object_id = entry.object_id[..].to_vec();
                     entry
                         .path
                         .components()
@@ -154,7 +153,7 @@ fn build_tree_from_tmp_entries(entries: impl Iterator<Item = TmpEntry>) -> (Tree
                     let file_mode = entry.file_mode;
                     TmpEntry {
                         path,
-                        object_id,
+                        object_id: entry.object_id,
                         file_mode,
                     }
                 })
@@ -163,7 +162,7 @@ fn build_tree_from_tmp_entries(entries: impl Iterator<Item = TmpEntry>) -> (Tree
                 build_tree_from_tmp_entries(tmp_entries.into_iter());
             let tree_entry = TreeEntry::new(
                 &PathBuf::from(prefix.as_os_str()),
-                root_tree.id(),
+                root_tree.id().clone(),
                 FileMode::Directory,
             );
 
@@ -179,10 +178,10 @@ fn build_tree_from_tmp_entries(entries: impl Iterator<Item = TmpEntry>) -> (Tree
     (Tree::new(tree_entries), trees)
 }
 
-fn next_if_prefixed_with(
+fn next_if_prefixed_with<'a>(
     prefix: &Component,
-    entries: &mut Peekable<impl Iterator<Item = TmpEntry>>,
-) -> Option<TmpEntry> {
+    entries: &mut Peekable<impl Iterator<Item = TmpEntry<'a>>>,
+) -> Option<TmpEntry<'a>> {
     if let Some(entry_peek) = entries.peek() {
         let peek_prefix = entry_peek.path.components().next().unwrap();
         return if peek_prefix == *prefix {

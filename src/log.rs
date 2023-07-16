@@ -2,7 +2,6 @@ use std::io;
 
 use chrono::{DateTime, Local};
 
-use crate::hex;
 use crate::objects::{Commit, GitObject};
 use crate::output::{Color, OutputWriter, Style};
 use crate::refs::RefHandler;
@@ -35,9 +34,7 @@ pub fn log(
     writer: &mut dyn OutputWriter,
 ) -> io::Result<()> {
     let refs = RefHandler::new(repository);
-    let head_commit_id = refs.head()?;
-    let head_commit_id_hex = &hex::from_hex_string(&head_commit_id).unwrap();
-    let head_commit = repository.database.load_commit(head_commit_id_hex)?;
+    let head_commit = repository.database.load_commit(&refs.head()?)?;
 
     let write_log = match options.format {
         Format::Oneline => write_log_message_oneline,
@@ -53,7 +50,7 @@ pub fn log(
     while commit.parent.is_some() && num_written_commits < max_count {
         commit = repository
             .database
-            .load_commit(&hex::from_hex_string(&commit.parent.unwrap()).unwrap())?;
+            .load_commit(&commit.parent.unwrap())?;
         write_log(&commit, None, writer)?;
         num_written_commits += 1;
     }

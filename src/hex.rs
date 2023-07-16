@@ -1,3 +1,5 @@
+use std::num::ParseIntError;
+
 pub fn to_hex_string(bytes: &[u8]) -> String {
     bytes
         .iter()
@@ -6,15 +8,15 @@ pub fn to_hex_string(bytes: &[u8]) -> String {
         .join("")
 }
 
-pub fn from_hex_string(hex: &str) -> Option<Vec<u8>> {
+pub fn from_hex_string(hex: &str) -> Result<Vec<u8>, ParseIntError> {
     hex.chars()
-        .map(|chr| u8::from_str_radix(&chr.to_string(), 16).ok())
+        .map(|chr| u8::from_str_radix(&chr.to_string(), 16))
         .collect()
 }
 
-pub fn from_hex_bytes(hex: &[u8]) -> Option<Vec<u8>> {
+pub fn from_hex_bytes(hex: &[u8]) -> Result<Vec<u8>, ParseIntError> {
     hex.iter()
-        .map(|hex_byte| u8::from_str_radix(&hex_byte.to_string(), 16).ok())
+        .map(|hex_byte| u8::from_str_radix(&hex_byte.to_string(), 16))
         .collect()
 }
 

@@ -6,9 +6,8 @@ use std::{fs, io};
 use walkdir::DirEntry;
 
 use crate::file;
-use crate::hex;
 use crate::index::Index;
-use crate::objects::{Blob, GitObject};
+use crate::objects::{Blob, GitObject, ObjectId};
 use crate::output::{Color, OutputWriter};
 use crate::refs::RefHandler;
 use crate::workspace::{Repository, Worktree};
@@ -69,7 +68,7 @@ pub fn status(
 }
 
 pub fn resolve_files_with_staged_changes(
-    path_to_committed_id: &HashMap<PathBuf, String>,
+    path_to_committed_id: &HashMap<PathBuf, ObjectId>,
     repository: &Repository,
     index: &Index,
 ) -> io::Result<Vec<PathBuf>> {
@@ -82,7 +81,7 @@ pub fn resolve_files_with_staged_changes(
 }
 
 pub fn resolve_files_with_unstaged_changes(
-    path_to_committed_id: &HashMap<PathBuf, String>,
+    path_to_committed_id: &HashMap<PathBuf, ObjectId>,
     repository: &Repository,
     index: &mut Index,
 ) -> io::Result<Vec<PathBuf>> {
@@ -243,7 +242,7 @@ fn print_paths(
 }
 
 pub fn resolve_tracked_paths(
-    path_to_committed_id: &HashMap<PathBuf, String>,
+    path_to_committed_id: &HashMap<PathBuf, ObjectId>,
     worktree: &Worktree,
     index: &Index,
 ) -> Vec<PathBuf> {
@@ -316,7 +315,7 @@ fn resolve_untracked(
 }
 
 fn resolve_staged_changes(
-    path_to_committed_id: &HashMap<PathBuf, String>,
+    path_to_committed_id: &HashMap<PathBuf, ObjectId>,
     repository: &Repository,
     index: &mut Index,
 ) -> io::Result<Vec<Change>> {
@@ -330,7 +329,7 @@ fn resolve_staged_changes(
 }
 
 fn resolve_staged_modifications(
-    path_to_committed_id: &HashMap<PathBuf, String>,
+    path_to_committed_id: &HashMap<PathBuf, ObjectId>,
     repository: &Repository,
     index: &Index,
 ) -> io::Result<Vec<Change>> {
@@ -354,7 +353,7 @@ fn resolve_staged_modifications(
 
 fn classify_staged_changes(
     staged_paths: &[PathBuf],
-    path_to_committed_id: &HashMap<PathBuf, String>,
+    path_to_committed_id: &HashMap<PathBuf, ObjectId>,
     repository: &Repository,
     index: &Index,
 ) -> io::Result<Vec<Change>> {
@@ -364,9 +363,8 @@ fn classify_staged_changes(
         let relative_path = repository.worktree().relativize_path(path);
         match path_to_committed_id.get(&relative_path) {
             Some(committed_object_id) => {
-                let indexed_object_id =
-                    hex::to_hex_string(&index.get(&relative_path).unwrap().object_id);
-                if *committed_object_id != indexed_object_id {
+                let indexed_object_id = &index.get(&relative_path).unwrap().object_id;
+                if committed_object_id != indexed_object_id {
                     changes.push(Change {
                         path: relative_path.to_owned(),
                         change_type: ChangeType::Modified,
@@ -386,7 +384,7 @@ fn classify_staged_changes(
 }
 
 fn resolve_staged_deletions(
-    path_to_committed_id: &HashMap<PathBuf, String>,
+    path_to_committed_id: &HashMap<PathBuf, ObjectId>,
     worktree: &Worktree,
     index: &Index,
 ) -> Vec<Change> {
@@ -419,7 +417,7 @@ fn resolve_unstaged_deletions<'a>(
 
 pub fn resolve_committed_paths_and_ids(
     repository: &Repository,
-) -> io::Result<HashMap<PathBuf, String>> {
+) -> io::Result<HashMap<PathBuf, ObjectId>> {
     let head_commit_id_opt = RefHandler::new(repository).head();
     if head_commit_id_opt.is_err() {
         return Ok(HashMap::new());
@@ -428,18 +426,18 @@ pub fn resolve_committed_paths_and_ids(
 
     let commit = repository
         .database
-        .load_commit(&hex::from_hex_string(&head_commit_id).unwrap())?;
+        .load_commit(&head_commit_id)?;
     let tree = repository
         .database
-        .load_tree(&hex::from_hex_string(&commit.tree).unwrap())?;
+        .load_tree(&commit.tree)?;
 
     let mut paths_in_head = vec![];
     repository
         .database
         .extract_paths_from_tree(String::from(""), &tree, &mut paths_in_head)?;
-    let path_to_id: HashMap<PathBuf, String> = paths_in_head
+    let path_to_id: HashMap<PathBuf, ObjectId> = paths_in_head
         .into_iter()
-        .map(|(id, path)| (PathBuf::from(path), id))
+        .map(|(id, path)| (PathBuf::from(path), ObjectId::from_hex_string(&id).unwrap()))
         .collect();
 
     Ok(path_to_id)
@@ -509,8 +507,8 @@ fn is_modified(absolute_path: &Path, tracked_path: &Path, index: &mut Index) -> 
     Ok(is_modified)
 }
 
-fn hash_as_blob(absolute_path: &Path) -> io::Result<Vec<u8>> {
+fn hash_as_blob(absolute_path: &Path) -> io::Result<ObjectId> {
     let content = file::read_file(absolute_path)?;
     let blob = Blob::new(content);
-    Ok(blob.id())
+    Ok(blob.id().clone())
 }

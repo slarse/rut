@@ -19,7 +19,7 @@ use crate::hex;
 use crate::index::FileMode;
 use crate::index::Index;
 use crate::objects::Blob;
-use crate::objects::{Author, Commit, GitObject, Tree, TreeEntry};
+use crate::objects::{Author, Commit, GitObject, ObjectId, Tree, TreeEntry};
 
 pub struct Database {
     git_dir: PathBuf,
@@ -37,13 +37,11 @@ impl Database {
         let object_id = git_object.id();
         let content = git_object.to_object_format();
 
-        let dirname = hex::to_hex_string(&object_id[..2]);
-        let filename = hex::to_hex_string(&object_id[2..]);
-        let dirpath = self.git_dir.join("objects").join(dirname);
+        let dirpath = self.git_dir.join("objects").join(object_id.dirname());
         fs::create_dir_all(&dirpath)?;
 
         let compressed_bytes = Database::compress(&content)?;
-        let object_filepath = dirpath.join(filename);
+        let object_filepath = dirpath.join(object_id.filename());
         if !object_filepath.exists() {
             file::atomic_write(&object_filepath, &compressed_bytes)?;
         }
@@ -58,15 +56,17 @@ impl Database {
         Ok(compressed_bytes)
     }
 
-    pub fn load_commit(&self, commit_id: &[u8]) -> io::Result<Commit> {
+    pub fn load_commit(&self, commit_id: &ObjectId) -> io::Result<Commit> {
         let content = self.load_data(commit_id)?;
         Ok(self.parse_commit(&mut content.into_iter()))
     }
 
-    fn load_data(&self, object_id: &[u8]) -> io::Result<Vec<u8>> {
-        let dirname = hex::to_hex_string(&object_id[..2]);
-        let filename = hex::to_hex_string(&object_id[2..]);
-        let object_path = self.git_dir.join("objects").join(dirname).join(filename);
+    fn load_data(&self, object_id: &ObjectId) -> io::Result<Vec<u8>> {
+        let object_path = self
+            .git_dir
+            .join("objects")
+            .join(object_id.dirname())
+            .join(object_id.filename());
         let data = Database::decompress(object_path)?;
 
         // TODO handle bad/unexpected object type
@@ -112,15 +112,14 @@ impl Database {
             }
         };
 
-        let parent = self.parse_parent(parent_line.as_ref());
+        let parent = self
+            .parse_parent(parent_line.as_ref())
+            .map(|parent| ObjectId::from_hex_string(&parent).unwrap());
         let (author_name, author_email, timestamp) = parse_author_details(&author_line);
 
         let tree_object_id_bytes: Vec<u8> =
-            tree_line.into_iter().skip_while(is_not_space).collect();
-        let tree_object_id = str::from_utf8(&tree_object_id_bytes)
-            .unwrap()
-            .trim()
-            .to_owned();
+            tree_line.into_iter().skip_while(is_not_space).skip(1).collect();
+        let tree_object_id = ObjectId::from_utf8_bytes(&tree_object_id_bytes).unwrap();
 
         let _committer_line = next_line(content); // TODO handle committer line
         let _empty_line = next_line(content);
@@ -133,13 +132,7 @@ impl Database {
             email: author_email,
         };
 
-        Commit {
-            tree: tree_object_id,
-            author,
-            message,
-            parent,
-            timestamp,
-        }
+        Commit::new(tree_object_id, author, message, parent, timestamp)
     }
 
     fn parse_parent(&self, parent_line: Option<&Vec<u8>>) -> Option<String> {
@@ -155,13 +148,13 @@ impl Database {
         })
     }
 
-    pub fn load_tree(&self, tree_id: &[u8]) -> io::Result<Tree> {
+    pub fn load_tree(&self, tree_id: &ObjectId) -> io::Result<Tree> {
         let content = self.load_data(tree_id)?;
         let tree_entries = parse_tree_entries(&mut content.into_iter());
         Ok(Tree::new(tree_entries))
     }
 
-    pub fn load_blob(&self, blob_id: &[u8]) -> io::Result<Blob> {
+    pub fn load_blob(&self, blob_id: &ObjectId) -> io::Result<Blob> {
         let content = self.load_data(blob_id)?;
         // TODO fix Blob::with_hash
         Ok(Blob::new(content))
@@ -203,7 +196,7 @@ impl Database {
                     self.extract_paths_from_tree(next_path, &tree, accumulator)?;
                 }
                 _ => {
-                    accumulator.push((hex::to_hex_string(&tree_entry.object_id), next_path));
+                    accumulator.push((tree_entry.object_id.to_string(), next_path));
                 }
             }
         }
@@ -243,7 +236,8 @@ fn parse_tree_entries(content: &mut impl Iterator<Item = u8>) -> Vec<TreeEntry> 
 fn parse_tree_entry(content: &mut impl Iterator<Item = u8>) -> TreeEntry {
     let mode_bytes = take_while(content, |byte: &u8| *byte != b' ');
     let name_bytes = take_while(content, |byte| *byte != 0);
-    let object_id = hex::unhexlify(&content.take(20).collect::<Vec<u8>>());
+    let raw_object_id = hex::unhexlify(&content.take(20).collect::<Vec<u8>>());
+    let object_id = ObjectId::from_bytes(&raw_object_id).unwrap();
 
     // TODO handle bad mode bytes
     let mode = match str::from_utf8(&mode_bytes).unwrap() {
@@ -315,7 +309,8 @@ mod tests {
 
         let entry = TreeEntry {
             name: String::from("file.txt"),
-            object_id: hex::from_hex_string("097711d5840f84b87f5567843471e886f5733d9a").unwrap(),
+            object_id: ObjectId::from_hex_string("097711d5840f84b87f5567843471e886f5733d9a")
+                .unwrap(),
             mode: FileMode::Regular,
         };
         let tree = Tree::new(vec![entry]);
@@ -339,17 +334,20 @@ mod tests {
 
         let regular_file_entry = TreeEntry {
             name: String::from("file.txt"),
-            object_id: hex::from_hex_string("097711d5840f84b87f5567843471e886f5733d9a").unwrap(),
+            object_id: ObjectId::from_hex_string("097711d5840f84b87f5567843471e886f5733d9a")
+                .unwrap(),
             mode: FileMode::Regular,
         };
         let executable_file_entry = TreeEntry {
             name: String::from("other_file.txt"),
-            object_id: hex::from_hex_string("097711d5840f84b87f5567843471e886f5733d9a").unwrap(),
+            object_id: ObjectId::from_hex_string("097711d5840f84b87f5567843471e886f5733d9a")
+                .unwrap(),
             mode: FileMode::Executable,
         };
         let dir_entry = TreeEntry {
             name: String::from("libs"),
-            object_id: hex::from_hex_string("a2db0a195a522272a018af06515a439bb5ec5ceb").unwrap(),
+            object_id: ObjectId::from_hex_string("a2db0a195a522272a018af06515a439bb5ec5ceb")
+                .unwrap(),
             mode: FileMode::Directory,
         };
 
@@ -392,8 +390,7 @@ mod tests {
         let database = Database::new(workdir);
 
         let first_commit = create_commit(None);
-        let first_commit_oid = first_commit.id_as_string();
-        let second_commit = create_commit(Some(first_commit_oid));
+        let second_commit = create_commit(Some(first_commit.id().clone()));
 
         database.store_object(&first_commit)?;
         database.store_object(&second_commit)?;
@@ -407,26 +404,25 @@ mod tests {
         Ok(())
     }
 
-    fn create_commit(parent: Option<String>) -> Commit {
+    fn create_commit(parent: Option<ObjectId>) -> Commit {
         let tree_entry = TreeEntry {
             name: String::from("file.txt"),
-            object_id: "ce013625030ba8dba906f756967f9e9ca394464a"
-                .as_bytes()
-                .to_owned(),
+            object_id: ObjectId::from_hex_string("ce013625030ba8dba906f756967f9e9ca394464a")
+                .unwrap(),
             mode: FileMode::Regular,
         };
-        let tree = Tree::new(vec![tree_entry]).id_as_string();
+        let tree = Tree::new(vec![tree_entry]);
         let author = Author {
             name: String::from("Full Name"),
             email: String::from("name@example.com"),
         };
-        Commit {
-            tree,
+        Commit::new(
+            tree.id().clone(),
             author,
-            message: String::from("Initial commit\n"),
+            String::from("Initial commit\n"),
             parent,
-            timestamp: 1666811962,
-        }
+            1666811962,
+        )
     }
 }
 

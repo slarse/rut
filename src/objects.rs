@@ -8,48 +8,102 @@ use crate::hex;
 use crate::index::FileMode;
 
 pub trait GitObject<'a> {
-    fn id(&'a self) -> Vec<u8>;
+    fn id(&'a self) -> &ObjectId;
 
     fn id_as_string(&'a self) -> String {
-        hex::to_hex_string(&self.id())
+        self.id().to_string()
     }
 
     fn short_id(&'a self) -> Vec<u8> {
-        self.id()[0..7].to_vec()
+        self.id().bytes()[0..7].to_vec()
     }
 
     fn short_id_as_string(&'a self) -> String {
-        to_short_id(&self.id())
+        self.id().to_short_string()
     }
 
     fn to_object_format(&self) -> Vec<u8>;
 }
 
-pub fn to_short_id(id: &[u8]) -> String {
-    hex::to_hex_string(&id[0..7])
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct ObjectId {
+    bytes: Vec<u8>,
+}
+
+impl ObjectId {
+    pub fn from_hex_string(s: &str) -> Result<ObjectId, String> {
+        let bytes = hex::from_hex_string(s).map_err(|e| e.to_string())?;
+        Self::from_bytes(&bytes)
+    }
+
+    pub fn from_hex_bytes(bytes: &[u8]) -> Result<ObjectId, String> {
+        let bytes = hex::from_hex_bytes(bytes).map_err(|e| e.to_string())?;
+        Self::from_bytes(&bytes)
+    }
+
+    pub fn from_utf8_bytes(bytes: &[u8]) -> Result<ObjectId, String> {
+        let bytes = str::from_utf8(bytes).map_err(|e| e.to_string())?;
+        Self::from_hex_string(bytes)
+    }
+
+    pub fn from_bytes(bytes: &[u8]) -> Result<ObjectId, String> {
+        let unhexlified_bytes = if bytes.len() == 20 {
+            hex::unhexlify(bytes)
+        } else if bytes.len() == 40 {
+            bytes.to_vec()
+        } else {
+            return Err(
+                "Object ID must be hexflified (20 bytes long) or in full (40 bytes long)"
+                    .to_string(),
+            );
+        };
+
+        Ok(ObjectId {
+            bytes: unhexlified_bytes,
+        })
+    }
+
+    pub fn bytes(&self) -> &[u8] {
+        &self.bytes
+    }
+
+    pub fn to_short_string(&self) -> String {
+        hex::to_hex_string(&self.bytes[0..7])
+    }
+
+    pub fn dirname(&self) -> String {
+        hex::to_hex_string(&self.bytes[0..2])
+    }
+
+    pub fn filename(&self) -> String {
+        hex::to_hex_string(&self.bytes[2..])
+    }
+}
+
+impl Display for ObjectId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let hex = hex::to_hex_string(&self.bytes);
+        write!(f, "{}", hex)
+    }
 }
 
 #[derive(Clone)]
 pub struct Blob {
     bytes: Vec<u8>,
-    id: Vec<u8>,
+    id: ObjectId,
 }
 
 impl Blob {
     pub fn new(bytes: Vec<u8>) -> Blob {
         let object_format = to_object_format("blob", &bytes);
-        let id = hashing::sha1_hash(&object_format);
-        Blob {
-            bytes,
-            id: id.to_vec(),
-        }
+        let raw_id = &hashing::sha1_hash(&object_format);
+        let id = ObjectId::from_bytes(raw_id).unwrap();
+        Blob { bytes, id }
     }
 
-    pub fn with_hash(bytes: Vec<u8>, id: &[u8]) -> Blob {
-        Blob {
-            bytes,
-            id: id.to_vec(),
-        }
+    pub fn with_hash(bytes: Vec<u8>, raw_id: &[u8]) -> Blob {
+        let id = ObjectId::from_bytes(raw_id).unwrap();
+        Blob { bytes, id }
     }
 
     pub fn content(&self) -> &[u8] {
@@ -58,8 +112,8 @@ impl Blob {
 }
 
 impl<'a> GitObject<'a> for Blob {
-    fn id(&'a self) -> Vec<u8> {
-        hex::unhexlify(&self.id[..])
+    fn id(&'a self) -> &ObjectId {
+        &self.id
     }
 
     fn to_object_format(&self) -> Vec<u8> {
@@ -80,12 +134,12 @@ fn to_object_format(object_type: &str, bytes: &[u8]) -> Vec<u8> {
 #[derive(Debug, PartialEq)]
 pub struct TreeEntry {
     pub name: String,
-    pub object_id: Vec<u8>,
+    pub object_id: ObjectId,
     pub mode: FileMode,
 }
 
 impl TreeEntry {
-    pub fn new(path: &Path, object_id: Vec<u8>, mode: FileMode) -> TreeEntry {
+    pub fn new(path: &Path, object_id: ObjectId, mode: FileMode) -> TreeEntry {
         let name = path
             .file_name()
             .and_then(|name| name.to_str())
@@ -102,32 +156,29 @@ impl TreeEntry {
 #[derive(Debug, PartialEq)]
 pub struct Tree {
     entries: Vec<TreeEntry>,
+    id: ObjectId,
 }
 
 impl Tree {
-    pub fn new(entries: Vec<TreeEntry>) -> Tree {
+    pub fn new(entries: Vec<TreeEntry>) -> Self {
         let mut mutable_entries = entries;
         mutable_entries.sort_by(|lhs, rhs| lhs.name.cmp(&rhs.name));
-        Tree {
+        let object_format = Self::to_object_format(&mutable_entries);
+        let hash = hashing::sha1_hash(&object_format);
+        let id = ObjectId::from_bytes(&hash).unwrap();
+        Self {
             entries: mutable_entries,
+            id,
         }
     }
 
     pub fn entries(&self) -> &[TreeEntry] {
         &self.entries[..]
     }
-}
 
-impl<'a> GitObject<'a> for Tree {
-    fn id(&'a self) -> Vec<u8> {
-        let object_format = self.to_object_format();
-        let hash = hashing::sha1_hash(&object_format);
-        hex::unhexlify(&hash)
-    }
-
-    fn to_object_format(&self) -> Vec<u8> {
+    fn to_object_format(entries: &[TreeEntry]) -> Vec<u8> {
         let mut bytes = Vec::new();
-        for entry in self.entries.iter() {
+        for entry in entries.iter() {
             let name_bytes = entry.name.as_bytes();
 
             let mode = match entry.mode {
@@ -140,10 +191,20 @@ impl<'a> GitObject<'a> for Tree {
             bytes.extend_from_slice(" ".as_bytes());
             bytes.extend_from_slice(name_bytes);
             bytes.push(0);
-            bytes.extend_from_slice(&hex::hexlify(&entry.object_id));
+            bytes.extend_from_slice(&hex::hexlify(entry.object_id.bytes()));
         }
 
         to_object_format("tree", &bytes)
+    }
+}
+
+impl<'a> GitObject<'a> for Tree {
+    fn id(&'a self) -> &ObjectId {
+        &self.id
+    }
+
+    fn to_object_format(&self) -> Vec<u8> {
+        Self::to_object_format(&self.entries)
     }
 }
 
@@ -162,35 +223,64 @@ impl Display for Author {
 
 #[derive(Debug, PartialEq)]
 pub struct Commit {
-    pub tree: String,
+    pub tree: ObjectId,
     pub author: Author,
     pub message: String,
-    pub parent: Option<String>,
+    pub parent: Option<ObjectId>,
     pub timestamp: u64,
+    id: ObjectId,
 }
 
-impl<'a> GitObject<'a> for Commit {
-    fn id(&self) -> Vec<u8> {
-        let object_format = self.to_object_format();
+impl Commit {
+    pub fn new(
+        tree: ObjectId,
+        author: Author,
+        message: String,
+        parent: Option<ObjectId>,
+        timestamp: u64,
+    ) -> Self {
+        let object_format =
+            Self::to_object_format(&tree, &author, &message, parent.as_ref(), timestamp);
         let hash = hashing::sha1_hash(&object_format);
-        hex::unhexlify(&hash)
+        let id = ObjectId::from_bytes(&hash).unwrap();
+        Self {
+            tree,
+            author,
+            message,
+            parent,
+            timestamp,
+            id,
+        }
     }
 
-    fn to_object_format(&self) -> Vec<u8> {
+    fn to_object_format(
+        tree: &ObjectId,
+        author: &Author,
+        message: &str,
+        parent: Option<&ObjectId>,
+        timestamp: u64,
+    ) -> Vec<u8> {
         let offset = Local::now().format("%z").to_string();
-        let author_with_timestamp = format!("{} {} {}", self.author, self.timestamp, offset);
+        let author_with_timestamp = format!("{} {} {}", author, timestamp, offset);
 
-        let content = match &self.parent {
+        let content = match &parent {
             Some(parent) => {
                 format!(
                     "tree {}\nparent {}\nauthor {}\ncommitter {}\n\n{}",
-                    self.tree, parent, author_with_timestamp, author_with_timestamp, self.message
+                    tree.to_string(),
+                    parent.to_string(),
+                    author_with_timestamp,
+                    author_with_timestamp,
+                    message
                 )
             }
             None => {
                 format!(
                     "tree {}\nauthor {}\ncommitter {}\n\n{}",
-                    self.tree, author_with_timestamp, author_with_timestamp, self.message
+                    tree.to_string(),
+                    author_with_timestamp,
+                    author_with_timestamp,
+                    message
                 )
             }
         };
@@ -199,19 +289,35 @@ impl<'a> GitObject<'a> for Commit {
     }
 }
 
+impl<'a> GitObject<'a> for Commit {
+    fn id(&self) -> &ObjectId {
+        &self.id
+    }
+
+    fn to_object_format(&self) -> Vec<u8> {
+        Self::to_object_format(
+            &self.tree,
+            &self.author,
+            &self.message,
+            self.parent.as_ref(),
+            self.timestamp,
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::hex;
 
     #[test]
     fn blob_computes_correct_id() {
         let content = "hello\n";
         let blob = Blob::new(content.as_bytes().to_vec());
 
-        let blob_hex = hex::to_hex_string(&blob.id());
-
-        assert_eq!(blob_hex, "ce013625030ba8dba906f756967f9e9ca394464a");
+        assert_eq!(
+            blob.id().to_string(),
+            "ce013625030ba8dba906f756967f9e9ca394464a"
+        );
     }
 
     #[test]

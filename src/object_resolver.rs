@@ -5,7 +5,6 @@ use std::{
 };
 
 use crate::{
-    hex,
     objects::{Blob, Tree},
     refs::RefHandler,
     workspace::{Database, Repository},
@@ -34,11 +33,8 @@ impl<'a> ObjectResolver<'a> {
 
     pub fn from_reference(reference: &str, repository: &'a Repository) -> io::Result<Self> {
         let commit_id = RefHandler::new(repository).deref(reference)?;
-        let commit = repository
-            .database
-            .load_commit(&hex::from_hex_string(&commit_id).unwrap())?;
-        let root_tree_id = hex::from_hex_string(&commit.tree).unwrap();
-        let root_tree = repository.database.load_tree(&root_tree_id).unwrap();
+        let commit = repository.database.load_commit(&commit_id)?;
+        let root_tree = repository.database.load_tree(&commit.tree)?;
 
         Ok(ObjectResolver::new(root_tree, &repository.database))
     }

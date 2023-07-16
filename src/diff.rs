@@ -7,9 +7,7 @@ use std::{
 use crate::{
     index::{Index, IndexEntry},
     object_resolver::ObjectResolver,
-    objects,
-    objects::Blob,
-    objects::GitObject,
+    objects::{Blob, GitObject},
     output::{Color, OutputWriter},
     status,
     workspace::Repository,
@@ -116,7 +114,7 @@ fn read_blob_from_index_entry(
     let blob = repository.database.load_blob(&index_entry.object_id)?;
     let content = String::from_utf8(blob.content().to_vec()).ok().unwrap();
     let lines: Vec<String> = content.split('\n').map(|s| s.to_owned()).collect();
-    let object_id = Some(objects::to_short_id(&index_entry.object_id));
+    let object_id = Some(index_entry.object_id.to_short_string());
     Ok((lines, object_id))
 }
 

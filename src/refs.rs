@@ -3,6 +3,7 @@ use std::io;
 use std::io::Error;
 use std::str;
 
+use crate::objects::ObjectId;
 use crate::workspace::Repository;
 
 pub struct RefHandler<'a> {
@@ -19,7 +20,7 @@ impl<'a> RefHandler<'a> {
     /**
      * Dereference a Git ref.
      */
-    pub fn deref(&self, reference: &str) -> io::Result<String> {
+    pub fn deref(&self, reference: &str) -> io::Result<ObjectId> {
         if reference == "HEAD" {
             return self.head();
         }
@@ -40,13 +41,13 @@ impl<'a> RefHandler<'a> {
             return Err(Error::new(io::ErrorKind::Other, message));
         };
 
-        Ok(result)
+        ObjectId::from_hex_string(&result).map_err(|parse_error| Error::new(io::ErrorKind::Other, parse_error))
     }
 
     /**
      * Convenience method to get the current head commit.
      */
-    pub fn head(&self) -> io::Result<String> {
+    pub fn head(&self) -> io::Result<ObjectId> {
         let head = self.repository.head()?;
         self.deref(&head)
     }

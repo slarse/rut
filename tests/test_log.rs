@@ -1,9 +1,9 @@
 use std::io;
 
-use rut::hex;
 use rut::log;
 
 use rut::objects::GitObject;
+use rut::objects::ObjectId;
 
 #[test]
 fn test_log() -> io::Result<()> {
@@ -19,7 +19,7 @@ fn test_log() -> io::Result<()> {
     // assert
     let commit = repository
         .database
-        .load_commit(&hex::from_hex_string(&commit_id).unwrap())?;
+        .load_commit(&ObjectId::from_hex_string(&commit_id).unwrap())?;
     let timestring = log::to_local_timestring(commit.timestamp).unwrap();
     let expected_output = format!(
         "commit {} (HEAD -> main)
@@ -105,10 +105,10 @@ fn test_log_two_commits_with_oneline_formatting() -> io::Result<()> {
     // assert
     let first_commit = repository
         .database
-        .load_commit(&hex::from_hex_string(&first_commit_id).unwrap())?;
+        .load_commit(&ObjectId::from_hex_string(&first_commit_id).unwrap())?;
     let second_commit = repository
         .database
-        .load_commit(&hex::from_hex_string(&second_commit_id).unwrap())?;
+        .load_commit(&ObjectId::from_hex_string(&second_commit_id).unwrap())?;
 
     assert_eq!(
         output,
