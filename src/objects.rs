@@ -346,23 +346,64 @@ impl<'a> GitObject<'a> for Commit {
 mod tests {
     use super::*;
 
-    #[test]
-    fn blob_computes_correct_id() {
-        let content = "hello\n";
-        let blob = Blob::new(content.as_bytes().to_vec());
+    mod blob_tests {
+        use super::*;
 
-        assert_eq!(
-            blob.id().to_string(),
-            "ce013625030ba8dba906f756967f9e9ca394464a"
-        );
+        #[test]
+        fn blob_computes_correct_id() {
+            let content = "hello\n";
+            let blob = Blob::new(content.as_bytes().to_vec());
+
+            assert_eq!(
+                blob.id().to_string(),
+                "ce013625030ba8dba906f756967f9e9ca394464a"
+            );
+        }
+
+        #[test]
+        fn blob_computes_correct_object_format() {
+            let content = "hello\n";
+            let expected_object_format = "blob 6\0hello\n";
+            let blob = Blob::new(content.as_bytes().to_vec());
+
+            assert_eq!(blob.to_object_format(), expected_object_format.as_bytes());
+        }
     }
 
-    #[test]
-    fn blob_computes_correct_object_format() {
-        let content = "hello\n";
-        let expected_object_format = "blob 6\0hello\n";
-        let blob = Blob::new(content.as_bytes().to_vec());
+    mod objectid_tests {
+        use super::*;
+        
+        use std::num::ParseIntError;
 
-        assert_eq!(blob.to_object_format(), expected_object_format.as_bytes());
+        #[test]
+        fn from_sha_error_on_invalid_length() {
+            let hash = "c";
+            let result = ObjectId::from_sha(hash);
+
+            assert!(result.is_err());
+        }
+
+        #[test]
+        fn from_sha_error_on_non_hex_characters() {
+            let hash = "xe013625030ba8dba906f756967f9e9ca394464a";
+            let result = ObjectId::from_sha(hash);
+
+            assert!(result.is_err());
+        }
+
+        #[test]
+        fn from_sha_bytes_accepts_hexlified_bytes() -> Result<(), ParseIntError> {
+            let hash = "ce013625030ba8dba906f756967f9e9ca394464a";
+            let bytes = hex::from_hex_string(hash)?;
+            let hexlified_bytes = hex::hexlify(&bytes);
+            let result = ObjectId::from_sha_bytes(&hexlified_bytes);
+
+            println!("{:?}", hexlified_bytes);
+
+
+            assert_eq!(result.unwrap().to_string(), hash);
+
+            Ok(())
+        }
     }
 }
