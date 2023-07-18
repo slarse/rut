@@ -41,7 +41,7 @@ impl<'a> RefHandler<'a> {
             return Err(Error::new(io::ErrorKind::Other, message));
         };
 
-        ObjectId::from_hex_string(&result).map_err(|parse_error| Error::new(io::ErrorKind::Other, parse_error))
+        ObjectId::from_sha(&result).map_err(|parse_error| Error::new(io::ErrorKind::Other, parse_error))
     }
 
     /**

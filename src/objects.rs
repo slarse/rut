@@ -25,28 +25,64 @@ pub trait GitObject<'a> {
     fn to_object_format(&self) -> Vec<u8>;
 }
 
+/**
+ * A Git object id is the sha1 hash of the object's content, which is represented as a 40 byte
+ * hexadecimal string. This struct encapsulates this concept and provides some utility methods
+ * related to common operations on object ids, such as finding out the filepath in the object
+ * database.
+ */
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct ObjectId {
     bytes: Vec<u8>,
 }
 
 impl ObjectId {
-    pub fn from_hex_string(s: &str) -> Result<ObjectId, String> {
+
+    /**
+     * Turn a hexadecimal string into an ObjectId. This is the inverse of to_string().
+     *
+     * # Examples
+     * ```
+     * use rut::objects::ObjectId;
+     *
+     * let id = ObjectId::from_sha("a94a8fe5ccb19ba61c4c0873d391e987982fbbd3").unwrap();
+     * assert_eq!(id.to_string(), "a94a8fe5ccb19ba61c4c0873d391e987982fbbd3");
+     * ```
+     */
+    pub fn from_sha(s: &str) -> Result<ObjectId, String> {
         let bytes = hex::from_hex_string(s).map_err(|e| e.to_string())?;
-        Self::from_bytes(&bytes)
+        Self::from_sha_bytes(&bytes)
     }
 
-    pub fn from_hex_bytes(bytes: &[u8]) -> Result<ObjectId, String> {
-        let bytes = hex::from_hex_bytes(bytes).map_err(|e| e.to_string())?;
-        Self::from_bytes(&bytes)
+    /**
+     * Turn a string that is the utf8 encoded version of a sha1 hash into an ObjectId.
+     *
+     * # Examples
+     * ```
+     * use rut::objects::ObjectId;
+     *
+     * let bytes = "a94a8fe5ccb19ba61c4c0873d391e987982fbbd3".as_bytes();
+     * let id = ObjectId::from_utf8_encoded_sha(bytes).unwrap();
+     * assert_eq!(id.to_string(), "a94a8fe5ccb19ba61c4c0873d391e987982fbbd3");
+     * ```
+     */
+    pub fn from_utf8_encoded_sha(bytes: &[u8]) -> Result<ObjectId, String> {
+        let s = str::from_utf8(bytes).map_err(|e| e.to_string())?;
+        Self::from_sha(s)
     }
 
-    pub fn from_utf8_bytes(bytes: &[u8]) -> Result<ObjectId, String> {
-        let bytes = str::from_utf8(bytes).map_err(|e| e.to_string())?;
-        Self::from_hex_string(bytes)
-    }
-
-    pub fn from_bytes(bytes: &[u8]) -> Result<ObjectId, String> {
+    /**
+     * Turn bytes into an ObjectId. This is the inverse of bytes().
+     *
+     * # Examples
+     * ```
+     * use rut::objects::ObjectId;
+     *
+     * let bytes = "a94a8fe5ccb19ba61c4c0873d391e987982fbbd3".as_bytes();
+     * let id = ObjectId::from_sha_bytes(bytes).unwrap();
+     * assert_eq!(id.bytes(), bytes);
+     */
+    pub fn from_sha_bytes(bytes: &[u8]) -> Result<ObjectId, String> {
         let unhexlified_bytes = if bytes.len() == 20 {
             hex::unhexlify(bytes)
         } else if bytes.len() == 40 {
@@ -62,6 +98,7 @@ impl ObjectId {
             bytes: unhexlified_bytes,
         })
     }
+
 
     pub fn bytes(&self) -> &[u8] {
         &self.bytes
@@ -97,12 +134,12 @@ impl Blob {
     pub fn new(bytes: Vec<u8>) -> Blob {
         let object_format = to_object_format("blob", &bytes);
         let raw_id = &hashing::sha1_hash(&object_format);
-        let id = ObjectId::from_bytes(raw_id).unwrap();
+        let id = ObjectId::from_sha_bytes(raw_id).unwrap();
         Blob { bytes, id }
     }
 
     pub fn with_hash(bytes: Vec<u8>, raw_id: &[u8]) -> Blob {
-        let id = ObjectId::from_bytes(raw_id).unwrap();
+        let id = ObjectId::from_sha_bytes(raw_id).unwrap();
         Blob { bytes, id }
     }
 
@@ -165,7 +202,7 @@ impl Tree {
         mutable_entries.sort_by(|lhs, rhs| lhs.name.cmp(&rhs.name));
         let object_format = Self::to_object_format(&mutable_entries);
         let hash = hashing::sha1_hash(&object_format);
-        let id = ObjectId::from_bytes(&hash).unwrap();
+        let id = ObjectId::from_sha_bytes(&hash).unwrap();
         Self {
             entries: mutable_entries,
             id,
@@ -242,7 +279,7 @@ impl Commit {
         let object_format =
             Self::to_object_format(&tree, &author, &message, parent.as_ref(), timestamp);
         let hash = hashing::sha1_hash(&object_format);
-        let id = ObjectId::from_bytes(&hash).unwrap();
+        let id = ObjectId::from_sha_bytes(&hash).unwrap();
         Self {
             tree,
             author,

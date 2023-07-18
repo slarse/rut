@@ -115,7 +115,7 @@ impl Index {
         let file_size = to_be_u32(&bytes[position..(position + BYTES_PER_U32)])?;
         position += BYTES_PER_U32;
         let raw_object_id = hex::unhexlify(&bytes[position..(position + BYTES_PER_PACKED_OID)]);
-        let object_id = ObjectId::from_bytes(&raw_object_id)?;
+        let object_id = ObjectId::from_sha_bytes(&raw_object_id)?;
         position += BYTES_PER_PACKED_OID;
 
         let path_size = to_be_u16(&bytes[position..(position + BYTES_PER_U16)])? as usize;
@@ -511,7 +511,7 @@ mod tests {
     #[test]
     fn test_as_vec() {
         let bytes: Vec<u8> = (0..10).cycle().map(|i| i as u8).take(40).collect();
-        let object_id = ObjectId::from_bytes(&bytes).unwrap();
+        let object_id = ObjectId::from_sha_bytes(&bytes).unwrap();
         let hexlified_object_id = hex::hexlify(object_id.bytes());
         let entry = IndexEntry {
             ctime_seconds: 1657658046,
@@ -542,7 +542,7 @@ mod tests {
 
     fn create_entry(path: &str) -> IndexEntry {
         let bytes: Vec<u8> = (0..10).cycle().map(|i| i as u8).take(40).collect();
-        let object_id = ObjectId::from_bytes(&bytes).unwrap();
+        let object_id = ObjectId::from_sha_bytes(&bytes).unwrap();
         IndexEntry {
             ctime_seconds: 1657658046,
             ctime_nanoseconds: 444900053,

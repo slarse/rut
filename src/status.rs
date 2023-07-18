@@ -437,7 +437,7 @@ pub fn resolve_committed_paths_and_ids(
         .extract_paths_from_tree(String::from(""), &tree, &mut paths_in_head)?;
     let path_to_id: HashMap<PathBuf, ObjectId> = paths_in_head
         .into_iter()
-        .map(|(id, path)| (PathBuf::from(path), ObjectId::from_hex_string(&id).unwrap()))
+        .map(|(id, path)| (PathBuf::from(path), ObjectId::from_sha(&id).unwrap()))
         .collect();
 
     Ok(path_to_id)
