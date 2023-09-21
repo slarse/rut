@@ -424,12 +424,8 @@ pub fn resolve_committed_paths_and_ids(
     }
     let head_commit_id = head_commit_id_opt.ok().unwrap();
 
-    let commit = repository
-        .database
-        .load_commit(&head_commit_id)?;
-    let tree = repository
-        .database
-        .load_tree(&commit.tree)?;
+    let commit = repository.database.load_commit(&head_commit_id)?;
+    let tree = repository.database.load_tree(&commit.tree)?;
 
     let mut paths_in_head = vec![];
     repository

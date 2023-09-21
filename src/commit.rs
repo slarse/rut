@@ -5,7 +5,7 @@ use std::{fs, io, path::PathBuf};
 
 use crate::hex::to_hex_string;
 use crate::index::{FileMode, Index, IndexEntry};
-use crate::objects::{Author, Commit, GitObject, Tree, TreeEntry, ObjectId};
+use crate::objects::{Author, Commit, GitObject, ObjectId, Tree, TreeEntry};
 use crate::output::OutputWriter;
 use crate::refs::RefHandler;
 use crate::workspace::Repository;
@@ -74,13 +74,7 @@ fn create_commit_with_tree(
         .unwrap()
         .as_secs();
 
-    Commit::new(
-        tree.clone(),
-        author,
-        message,
-        parent,
-        timestamp,
-    )
+    Commit::new(tree.clone(), author, message, parent, timestamp)
 }
 
 fn write_commit_status(commit: &Commit, writer: &mut dyn OutputWriter) -> io::Result<()> {
@@ -113,13 +107,15 @@ fn build_tree(entries: &[&IndexEntry]) -> (Tree, Vec<Tree>) {
 }
 
 #[derive(Debug)]
-struct TmpEntry <'a> {
+struct TmpEntry<'a> {
     path: PathBuf,
     object_id: &'a ObjectId,
     file_mode: FileMode,
 }
 
-fn build_tree_from_tmp_entries<'a>(entries: impl Iterator<Item = TmpEntry<'a>>) -> (Tree, Vec<Tree>) {
+fn build_tree_from_tmp_entries<'a>(
+    entries: impl Iterator<Item = TmpEntry<'a>>,
+) -> (Tree, Vec<Tree>) {
     let mut entry_iter = entries.peekable();
     let mut tree_entries = Vec::new();
 

@@ -37,7 +37,6 @@ pub struct ObjectId {
 }
 
 impl ObjectId {
-
     /**
      * Turn a hexadecimal string into an ObjectId. This is the inverse of to_string().
      *
@@ -98,7 +97,6 @@ impl ObjectId {
             bytes: unhexlified_bytes,
         })
     }
-
 
     pub fn bytes(&self) -> &[u8] {
         &self.bytes
@@ -372,7 +370,7 @@ mod tests {
 
     mod objectid_tests {
         use super::*;
-        
+
         use std::num::ParseIntError;
 
         #[test]
@@ -399,7 +397,6 @@ mod tests {
             let result = ObjectId::from_sha_bytes(&hexlified_bytes);
 
             println!("{:?}", hexlified_bytes);
-
 
             assert_eq!(result.unwrap().to_string(), hash);
 

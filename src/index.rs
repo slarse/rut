@@ -534,7 +534,7 @@ mod tests {
         ];
         expected_vec.extend_from_slice(&hexlified_object_id);
         expected_vec.extend(vec![
-            0, 10, 67, 97, 114, 103, 111, 46, 116, 111, 109, 108, 0, 0, 0, 0, 0, 0, 0, 0
+            0, 10, 67, 97, 114, 103, 111, 46, 116, 111, 109, 108, 0, 0, 0, 0, 0, 0, 0, 0,
         ]);
 
         assert_vectors_equal(&entry.as_vec(), &expected_vec);

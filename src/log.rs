@@ -48,9 +48,7 @@ pub fn log(
 
     let mut commit = head_commit;
     while commit.parent.is_some() && num_written_commits < max_count {
-        commit = repository
-            .database
-            .load_commit(&commit.parent.unwrap())?;
+        commit = repository.database.load_commit(&commit.parent.unwrap())?;
         write_log(&commit, None, writer)?;
         num_written_commits += 1;
     }

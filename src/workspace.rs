@@ -117,8 +117,11 @@ impl Database {
             .map(|parent| ObjectId::from_sha(&parent).unwrap());
         let (author_name, author_email, timestamp) = parse_author_details(&author_line);
 
-        let tree_object_id_bytes: Vec<u8> =
-            tree_line.into_iter().skip_while(is_not_space).skip(1).collect();
+        let tree_object_id_bytes: Vec<u8> = tree_line
+            .into_iter()
+            .skip_while(is_not_space)
+            .skip(1)
+            .collect();
         let tree_object_id = ObjectId::from_utf8_encoded_sha(&tree_object_id_bytes).unwrap();
 
         let _committer_line = next_line(content); // TODO handle committer line
@@ -309,8 +312,7 @@ mod tests {
 
         let entry = TreeEntry {
             name: String::from("file.txt"),
-            object_id: ObjectId::from_sha("097711d5840f84b87f5567843471e886f5733d9a")
-                .unwrap(),
+            object_id: ObjectId::from_sha("097711d5840f84b87f5567843471e886f5733d9a").unwrap(),
             mode: FileMode::Regular,
         };
         let tree = Tree::new(vec![entry]);
@@ -334,20 +336,17 @@ mod tests {
 
         let regular_file_entry = TreeEntry {
             name: String::from("file.txt"),
-            object_id: ObjectId::from_sha("097711d5840f84b87f5567843471e886f5733d9a")
-                .unwrap(),
+            object_id: ObjectId::from_sha("097711d5840f84b87f5567843471e886f5733d9a").unwrap(),
             mode: FileMode::Regular,
         };
         let executable_file_entry = TreeEntry {
             name: String::from("other_file.txt"),
-            object_id: ObjectId::from_sha("097711d5840f84b87f5567843471e886f5733d9a")
-                .unwrap(),
+            object_id: ObjectId::from_sha("097711d5840f84b87f5567843471e886f5733d9a").unwrap(),
             mode: FileMode::Executable,
         };
         let dir_entry = TreeEntry {
             name: String::from("libs"),
-            object_id: ObjectId::from_sha("a2db0a195a522272a018af06515a439bb5ec5ceb")
-                .unwrap(),
+            object_id: ObjectId::from_sha("a2db0a195a522272a018af06515a439bb5ec5ceb").unwrap(),
             mode: FileMode::Directory,
         };
 
@@ -407,8 +406,7 @@ mod tests {
     fn create_commit(parent: Option<ObjectId>) -> Commit {
         let tree_entry = TreeEntry {
             name: String::from("file.txt"),
-            object_id: ObjectId::from_sha("ce013625030ba8dba906f756967f9e9ca394464a")
-                .unwrap(),
+            object_id: ObjectId::from_sha("ce013625030ba8dba906f756967f9e9ca394464a").unwrap(),
             mode: FileMode::Regular,
         };
         let tree = Tree::new(vec![tree_entry]);
