@@ -57,8 +57,10 @@ Rut currently supports the following subset of Git:
 * `commit`
     - Create a commit of the current index
     - Author and email is taken from the `GIT_AUTHOR_NAME` and
-      `GIT_AUTHOR_EMAIL` environment variables
-    - The commit message is taken from the `.git/COMMIT_EDITMSG` file
+      `GIT_AUTHOR_EMAIL` environment variables or the global `$HOME/.gitconfig`
+      file.
+    - The commit message is taken from the `.git/COMMIT_EDITMSG` file or the
+      `-m` option.
 * `status`
     - Mostly up-to-par with `git status`
     - Currently does not attempt to identify renamed files
