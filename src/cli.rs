@@ -1,7 +1,7 @@
-use std::ffi::{OsString, c_int};
-use std::os::unix::io::AsRawFd;
+use std::ffi::{c_int, OsString};
 use std::fmt::Debug;
 use std::io::Error;
+use std::os::unix::io::AsRawFd;
 
 use crate::output::{Color, OutputWriter, Style};
 use crate::{add, commit, diff, init, log, restore, rm, status, workspace::Repository};
@@ -138,7 +138,7 @@ impl StdoutWriter {
 
     fn print_ansi_code(&mut self, ansi_code: &str) {
         if !self.isatty {
-            return
+            return;
         }
 
         print!("\x1b[{}m", ansi_code);
@@ -175,7 +175,6 @@ impl OutputWriter for StdoutWriter {
         self.print_ansi_code("0");
         Ok(self)
     }
-
 }
 
 fn resolve_path(path: &str, repository: &Repository) -> io::Result<PathBuf> {

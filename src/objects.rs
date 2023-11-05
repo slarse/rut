@@ -302,20 +302,13 @@ impl Commit {
             Some(parent) => {
                 format!(
                     "tree {}\nparent {}\nauthor {}\ncommitter {}\n\n{}",
-                    tree,
-                    parent,
-                    author_with_timestamp,
-                    author_with_timestamp,
-                    message
+                    tree, parent, author_with_timestamp, author_with_timestamp, message
                 )
             }
             None => {
                 format!(
                     "tree {}\nauthor {}\ncommitter {}\n\n{}",
-                    tree,
-                    author_with_timestamp,
-                    author_with_timestamp,
-                    message
+                    tree, author_with_timestamp, author_with_timestamp, message
                 )
             }
         };
