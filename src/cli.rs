@@ -160,10 +160,10 @@ fn print_ansi_code(ansi_code: &str) {
 
 fn resolve_path(path: &str, repository: &Repository) -> io::Result<PathBuf> {
     let resolved = repository.worktree().root().join(path);
-    return if resolved.exists() {
+    if resolved.exists() {
         Ok(resolved)
     } else {
         let message = format!("pathspec {:?} did not match any files", resolved);
         Err(Error::new(io::ErrorKind::Other, message))
-    };
+    }
 }

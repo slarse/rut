@@ -10,10 +10,10 @@ pub struct Config {
 pub fn read_config() -> Result<Config, env::VarError> {
     let gitconfig = parse_gitconfig(get_gitconfig_path().unwrap()).unwrap();
 
-    return Ok(Config {
+    Ok(Config {
         author_name: env::var("GIT_AUTHOR_NAME").or_else(|_| Ok(gitconfig.name.unwrap()))?,
         author_email: env::var("GIT_AUTHOR_EMAIL").or_else(|_| Ok(gitconfig.email.unwrap()))?,
-    });
+    })
 }
 
 pub struct UserConfig {

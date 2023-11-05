@@ -7,16 +7,11 @@ use crate::output::{Color, OutputWriter, Style};
 use crate::refs::RefHandler;
 use crate::workspace::Repository;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub enum Format {
-    Oneline,
+    #[default]
     Default,
-}
-
-impl Default for Format {
-    fn default() -> Self {
-        Format::Default
-    }
+    Oneline,
 }
 
 #[derive(Default, Builder, Debug)]

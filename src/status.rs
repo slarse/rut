@@ -17,16 +17,11 @@ pub struct Options {
     pub output_format: OutputFormat,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub enum OutputFormat {
-    Porcelain,
+    #[default]
     HumanReadable,
-}
-
-impl Default for OutputFormat {
-    fn default() -> Self {
-        OutputFormat::HumanReadable
-    }
+    Porcelain,
 }
 
 pub fn status(
