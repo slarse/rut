@@ -4,7 +4,7 @@ use rut::cli::{self, StdoutWriter};
 
 pub fn main() {
     let args: Vec<String> = env::args().collect();
-    let mut writer = StdoutWriter {};
+    let mut writer = StdoutWriter::new();
 
     let workdir = match env::current_dir() {
         Ok(dir) => dir,

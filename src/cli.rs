@@ -1,4 +1,5 @@
-use std::ffi::OsString;
+use std::ffi::{OsString, c_int};
+use std::os::unix::io::AsRawFd;
 use std::fmt::Debug;
 use std::io::Error;
 
@@ -120,7 +121,29 @@ pub fn run_command<P: AsRef<Path>, S: Into<OsString> + Clone>(
     Ok(())
 }
 
-pub struct StdoutWriter;
+pub struct StdoutWriter {
+    isatty: bool,
+}
+
+extern "C" {
+    fn isatty(fd: c_int) -> c_int;
+}
+
+impl StdoutWriter {
+    pub fn new() -> Self {
+        let stdout_fd = io::stdout().as_raw_fd();
+        let isatty = unsafe { isatty(stdout_fd) } != 0;
+        Self { isatty }
+    }
+
+    fn print_ansi_code(&mut self, ansi_code: &str) {
+        if !self.isatty {
+            return
+        }
+
+        print!("\x1b[{}m", ansi_code);
+    }
+}
 
 impl OutputWriter for StdoutWriter {
     fn write(&mut self, content: String) -> io::Result<&mut dyn OutputWriter> {
@@ -135,7 +158,7 @@ impl OutputWriter for StdoutWriter {
             Color::Cyan => "36",
             Color::Brown => "38;5;130",
         };
-        print_ansi_code(ansi_code);
+        self.print_ansi_code(ansi_code);
         Ok(self)
     }
 
@@ -144,18 +167,15 @@ impl OutputWriter for StdoutWriter {
             Style::Bold => "1",
             Style::Normal => "22",
         };
-        print_ansi_code(ansi_code);
+        self.print_ansi_code(ansi_code);
         Ok(self)
     }
 
     fn reset_formatting(&mut self) -> io::Result<&mut dyn OutputWriter> {
-        print!("\x1b[0m");
+        self.print_ansi_code("0");
         Ok(self)
     }
-}
 
-fn print_ansi_code(ansi_code: &str) {
-    print!("\x1b[{}m", ansi_code);
 }
 
 fn resolve_path(path: &str, repository: &Repository) -> io::Result<PathBuf> {
