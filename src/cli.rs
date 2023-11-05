@@ -1,12 +1,11 @@
+use std::ffi::OsString;
 use std::fmt::Debug;
 use std::io::Error;
 
 use crate::output::{Color, OutputWriter, Style};
-use crate::{add, commit, init, log, rm, status, workspace::Repository};
-use crate::{diff, restore};
-use std::env;
+use crate::{add, commit, diff, init, log, restore, rm, status, workspace::Repository};
 use std::io;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use clap::{Parser, Subcommand};
 
@@ -50,25 +49,27 @@ enum Action {
     },
 }
 
-pub fn run_command(args: Vec<String>) -> io::Result<()> {
-    let workdir = env::current_dir()?;
-    let git_dir = workdir.join(".git");
+pub fn run_command<P: AsRef<Path>, S: Into<OsString> + Clone>(
+    args: Vec<S>,
+    workdir: P,
+    writer: &mut dyn OutputWriter,
+) -> io::Result<()> {
+    let git_dir = workdir.as_ref().join(".git");
 
     let repository = Repository::from_worktree_root(workdir);
-    let mut writer = StdoutWriter {};
 
     let args = Args::parse_from(args);
 
     match args.action {
         Action::Init => {
-            init::init(&git_dir, &mut writer)?;
+            init::init(&git_dir, writer)?;
         }
         Action::Commit { message } => {
             let options = commit::OptionsBuilder::default()
                 .message(message)
                 .build()
                 .unwrap();
-            commit::commit(&repository, &options, &mut writer)?;
+            commit::commit(&repository, &options, writer)?;
         }
         Action::Add { path } => {
             add::add(resolve_path(&path)?, &repository)?;
@@ -84,14 +85,14 @@ pub fn run_command(args: Vec<String>) -> io::Result<()> {
                     status::OutputFormat::HumanReadable
                 },
             };
-            status::status(&repository, &options, &mut writer)?;
+            status::status(&repository, &options, writer)?;
         }
         Action::Diff { cached } => {
             let options = diff::OptionsBuilder::default()
                 .cached(cached)
                 .build()
                 .unwrap();
-            diff::diff_repository(&repository, &options, &mut writer)?;
+            diff::diff_repository(&repository, &options, writer)?;
         }
         Action::Restore { path, source } => {
             let options = restore::OptionsBuilder::default()
@@ -112,7 +113,7 @@ pub fn run_command(args: Vec<String>) -> io::Result<()> {
                 .format(format)
                 .build()
                 .unwrap();
-            log::log(&repository, &options, &mut writer)?;
+            log::log(&repository, &options, writer)?;
         }
     }
 

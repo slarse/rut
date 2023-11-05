@@ -1,4 +1,5 @@
 use std::{
+    ffi::OsString,
     fs,
     fs::File,
     io,
@@ -10,11 +11,41 @@ use std::{
 };
 
 use rut::{
-    add, commit, diff, init, log,
-    output::{Color, Style, OutputWriter},
+    add, cli, commit, diff, init, log,
+    output::{Color, OutputWriter, Style},
     restore, rm, status,
     workspace::Repository,
 };
+
+use shlex;
+
+pub fn run_command<S: Into<OsString> + Clone + From<&'static str>>(
+    args: Vec<S>,
+    repository: &Repository,
+) -> io::Result<String> {
+    let mut writer = CapturingOutputWriter {
+        output: String::new(),
+    };
+    
+    let has_rut = args.get(0).map(|arg| arg.to_owned().into() == "rut").unwrap_or(false);
+    let complete_args = if has_rut {
+        args
+    } else {
+        let mut complete_args = args.clone();
+        complete_args.insert(0, "rut".into());
+        complete_args
+    };
+
+    cli::run_command(complete_args, repository.worktree().root(), &mut writer)?;
+    Ok(writer.output)
+}
+
+pub fn run_command_string<S: AsRef<str>>(args: S, repository: &Repository) -> io::Result<String> {
+    let args = shlex::split(args.as_ref())
+        .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "Failed to split arguments"))?;
+    let result = run_command(args, repository)?;
+    Ok(result)
+}
 
 pub fn rut_commit_with_output_capture(
     commit_message: &str,
