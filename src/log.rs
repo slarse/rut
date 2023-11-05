@@ -1,6 +1,6 @@
 use std::io;
 
-use chrono::{DateTime, Local};
+use chrono::{Local, TimeZone};
 
 use crate::objects::{Commit, GitObject};
 use crate::output::{Color, OutputWriter, Style};
@@ -120,9 +120,12 @@ fn write_branch(branch: &str, writer: &mut dyn OutputWriter) -> io::Result<()> {
 
 pub fn to_local_timestring(timestamp: u64) -> Option<String> {
     let local_time = Local::now();
-    let datetime = DateTime::<Local>::from_utc(
-        chrono::NaiveDateTime::from_timestamp_opt(timestamp as i64, 0)?,
-        local_time.offset().to_owned(),
-    );
+    let datetime =
+        local_time
+            .timezone()
+            .from_utc_datetime(&chrono::NaiveDateTime::from_timestamp_opt(
+                timestamp as i64,
+                0,
+            )?);
     Some(datetime.format("%a %b%e %T %Y %z").to_string())
 }
