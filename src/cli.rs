@@ -75,7 +75,7 @@ pub fn run_command<P: AsRef<Path>, S: Into<OsString> + Clone>(
             add::add(path, &repository)?;
         }
         Action::Rm { path } => {
-            rm::rm(resolve_path(&path)?, &repository)?;
+            rm::rm(resolve_path(&path, &repository)?, &repository)?;
         }
         Action::Status { porcelain } => {
             let options = status::Options {
@@ -99,7 +99,7 @@ pub fn run_command<P: AsRef<Path>, S: Into<OsString> + Clone>(
                 .source(source)
                 .build()
                 .unwrap();
-            restore::restore_worktree(resolve_path(&path)?, &options, &repository)?;
+            restore::restore_worktree(resolve_path(&path, &repository)?, &options, &repository)?;
         }
         Action::Log { max_count, oneline } => {
             let format = if oneline {
@@ -158,8 +158,8 @@ fn print_ansi_code(ansi_code: &str) {
     print!("\x1b[{}m", ansi_code);
 }
 
-fn resolve_path(path: &str) -> io::Result<PathBuf> {
-    let resolved = PathBuf::from(path);
+fn resolve_path(path: &str, repository: &Repository) -> io::Result<PathBuf> {
+    let resolved = repository.worktree().root().join(path);
     return if resolved.exists() {
         Ok(resolved)
     } else {
