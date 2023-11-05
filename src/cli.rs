@@ -1,14 +1,17 @@
 use std::ffi::{c_int, OsString};
 use std::fmt::Debug;
-use std::io::Error;
+use std::io::{Error, Write};
 use std::os::unix::io::AsRawFd;
 
 use crate::output::{Color, OutputWriter, Style};
 use crate::{add, commit, diff, init, log, restore, rm, status, workspace::Repository};
 use std::io;
 use std::path::{Path, PathBuf};
+use std::process::{Child, Command, Stdio};
 
 use clap::{Parser, Subcommand};
+
+const PRE_PAGER_BUFFER_SIZE: usize = 50;
 
 #[derive(Parser, Debug)]
 struct Args {
@@ -123,6 +126,8 @@ pub fn run_command<P: AsRef<Path>, S: Into<OsString> + Clone>(
 
 pub struct StdoutWriter {
     isatty: bool,
+    pager: Option<Child>,
+    pre_pager_buffer: Option<Vec<String>>,
 }
 
 extern "C" {
@@ -133,21 +138,68 @@ impl StdoutWriter {
     pub fn new() -> Self {
         let stdout_fd = io::stdout().as_raw_fd();
         let isatty = unsafe { isatty(stdout_fd) } != 0;
-        Self { isatty }
+        Self { isatty, pager: None, pre_pager_buffer: Some(vec![]) }
     }
 
-    fn print_ansi_code(&mut self, ansi_code: &str) {
+    fn print_ansi_code(&mut self, ansi_code: &str) -> io::Result<&mut dyn OutputWriter> {
         if !self.isatty {
-            return;
+            return Ok(self);
         }
 
-        print!("\x1b[{}m", ansi_code);
+        self.write(format!("\x1b[{}m", ansi_code))
+    }
+
+    fn attach_pager(&mut self) -> &mut Self {
+        self.pager = Some(
+            Command::new("less")
+                .arg("-R")
+                .stdin(Stdio::piped())
+                .spawn()
+                .unwrap(),
+        );
+        return self;
+    }
+
+    fn flush_buffer(&mut self) {
+        let buffer = self.pre_pager_buffer.take().unwrap();
+        if self.isatty && buffer.len() > PRE_PAGER_BUFFER_SIZE {
+            self.attach_pager();
+        }
+
+        for line in buffer {
+            self.write(line).unwrap();
+        }
+    }
+}
+
+impl Drop for StdoutWriter {
+    fn drop(&mut self) {
+        if self.pre_pager_buffer.is_some() {
+            self.flush_buffer();
+        }
+        if let Some(ref mut pager) = self.pager {
+            pager.wait().unwrap();
+        }
     }
 }
 
 impl OutputWriter for StdoutWriter {
     fn write(&mut self, content: String) -> io::Result<&mut dyn OutputWriter> {
-        print!("{}", content);
+        if let Some(ref mut buffer) = self.pre_pager_buffer {
+            buffer.push(content);
+            if buffer.len() > PRE_PAGER_BUFFER_SIZE {
+                self.flush_buffer();
+            }
+        } else if let Some(ref mut pager) = self.pager {
+            pager
+                .stdin
+                .as_mut()
+                .unwrap()
+                .write_all(content.as_bytes())
+                .unwrap();
+        } else {
+            print!("{}", content);
+        }
         Ok(self)
     }
 
@@ -158,8 +210,7 @@ impl OutputWriter for StdoutWriter {
             Color::Cyan => "36",
             Color::Brown => "38;5;130",
         };
-        self.print_ansi_code(ansi_code);
-        Ok(self)
+        self.print_ansi_code(ansi_code)
     }
 
     fn set_style(&mut self, style: Style) -> io::Result<&mut dyn OutputWriter> {
@@ -167,13 +218,11 @@ impl OutputWriter for StdoutWriter {
             Style::Bold => "1",
             Style::Normal => "22",
         };
-        self.print_ansi_code(ansi_code);
-        Ok(self)
+        self.print_ansi_code(ansi_code)
     }
 
     fn reset_formatting(&mut self) -> io::Result<&mut dyn OutputWriter> {
-        self.print_ansi_code("0");
-        Ok(self)
+        self.print_ansi_code("0")
     }
 }
 
