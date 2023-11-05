@@ -1,6 +1,6 @@
 use std::{fs, io, path::PathBuf};
 
-use rut::{add, index::Index};
+use rut::index::Index;
 
 #[test]
 fn test_add_directory() -> io::Result<()> {
@@ -17,7 +17,8 @@ fn test_add_directory() -> io::Result<()> {
     fs::write(file_in_nested_dir, "A file.")?;
 
     // act
-    rut_testhelpers::rut_add(workdir, &repository);
+    let command = format!("add {}", workdir.to_str().unwrap());
+    rut_testhelpers::run_command_string(command, &repository)?;
 
     // assert
     let index = Index::from_file(repository.git_dir().join("index"))?;
@@ -52,12 +53,13 @@ fn test_adding_file_when_index_is_locked() -> io::Result<()> {
     fs::write(&index_lockfile, ";")?;
 
     // act
-    let add_result = add::add(readme, &repository);
+    let command = format!("add {}", readme.to_str().unwrap());
+    let add_result = rut_testhelpers::run_command_string(command, &repository);
 
     // assert
     assert!(add_result.is_err());
     match add_result {
-        Ok(()) => panic!("should have failed to add due to index lock"),
+        Ok(_) => panic!("should have failed to add due to index lock"),
         Err(error) => {
             let message = error.to_string();
             let expected_message = format!(
@@ -85,7 +87,8 @@ fn test_add_removed_file() -> io::Result<()> {
     fs::remove_file(&readme)?;
 
     // act
-    add::add(&readme, &repository)?;
+    let command = format!("add {}", readme.to_str().unwrap());
+    rut_testhelpers::run_command_string(command, &repository)?;
 
     // assert
     let index = repository.load_index_unlocked()?;
@@ -93,6 +96,27 @@ fn test_add_removed_file() -> io::Result<()> {
     let readme_entry = index.get(&readme_relative_path);
 
     assert!(readme_entry.is_none());
+
+    Ok(())
+}
+
+#[test]
+fn test_add_nonexisting_file() -> io::Result<()> {
+    // arrange
+    let repository = rut_testhelpers::create_repository();
+
+    let add_result =
+        rut_testhelpers::run_command_string("add file/that/does/not/exist", &repository);
+
+    match add_result {
+        Ok(_) => panic!("should have failed to add nonexisting file"),
+        Err(error) => {
+            let message = error.to_string();
+            let expected_message =
+                "fatal: pathspec \"file/that/does/not/exist\" did not match any files";
+            assert_eq!(message, expected_message);
+        }
+    };
 
     Ok(())
 }

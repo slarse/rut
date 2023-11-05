@@ -72,7 +72,7 @@ pub fn run_command<P: AsRef<Path>, S: Into<OsString> + Clone>(
             commit::commit(&repository, &options, writer)?;
         }
         Action::Add { path } => {
-            add::add(resolve_path(&path)?, &repository)?;
+            add::add(path, &repository)?;
         }
         Action::Rm { path } => {
             rm::rm(resolve_path(&path)?, &repository)?;

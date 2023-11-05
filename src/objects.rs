@@ -396,8 +396,6 @@ mod tests {
             let hexlified_bytes = hex::hexlify(&bytes);
             let result = ObjectId::from_sha_bytes(&hexlified_bytes);
 
-            println!("{:?}", hexlified_bytes);
-
             assert_eq!(result.unwrap().to_string(), hash);
 
             Ok(())

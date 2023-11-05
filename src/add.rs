@@ -17,13 +17,22 @@ pub fn add<P: AsRef<Path>>(path: P, repository: &Repository) -> io::Result<()> {
     let absolute_path = repository.worktree().root().join(&path);
     let mut index = repository.load_index()?;
 
-    if absolute_path.exists() {
+    if absolute_path.try_exists().unwrap_or(false) {
         for path in file::resolve_files(&absolute_path) {
             add_file(&path, index.as_mut(), repository)?;
         }
     } else {
         let relative_path = repository.worktree().relativize_path(&absolute_path);
-        index.as_mut().remove(&relative_path);
+        match index.as_mut().remove(&relative_path) {
+            Some(_) => (),
+            None => {
+                let message = format!(
+                    "fatal: pathspec {:?} did not match any files",
+                    path.as_ref()
+                );
+                return Err(io::Error::new(io::ErrorKind::NotFound, message));
+            }
+        }
     }
 
     index.write()
