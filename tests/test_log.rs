@@ -14,7 +14,7 @@ fn test_log() -> io::Result<()> {
     let commit_id = rut_testhelpers::commit_content(&repository, &file, "content", "First commit")?;
 
     // act
-    let output = rut_testhelpers::rut_log_default(&repository)?;
+    let output = rut_testhelpers::run_command_string("log", &repository)?;
 
     // assert
     let commit = repository
@@ -47,7 +47,7 @@ fn test_log_two_commits() -> io::Result<()> {
         rut_testhelpers::commit_content(&repository, &file, "more content", "Second commit")?;
 
     // act
-    let output = rut_testhelpers::rut_log_default(&repository)?;
+    let output = rut_testhelpers::run_command_string("log", &repository)?;
 
     // assert
     assert!(output.contains(&first_commit_id));
@@ -68,11 +68,7 @@ fn test_log_two_commits_with_max_count_1() -> io::Result<()> {
         rut_testhelpers::commit_content(&repository, &file, "more content", "Second commit")?;
 
     // act
-    let options = log::OptionsBuilder::default()
-        .max_count(Some(1))
-        .build()
-        .unwrap();
-    let output = rut_testhelpers::rut_log(&repository, &options)?;
+    let output = rut_testhelpers::run_command_string("log -n 1", &repository)?;
 
     // assert
     assert!(output.contains(&second_commit_id));
@@ -96,11 +92,7 @@ fn test_log_two_commits_with_oneline_formatting() -> io::Result<()> {
     )?;
 
     // act
-    let options = log::OptionsBuilder::default()
-        .format(log::Format::Oneline)
-        .build()
-        .unwrap();
-    let output = rut_testhelpers::rut_log(&repository, &options)?;
+    let output = rut_testhelpers::run_command_string("log --oneline", &repository)?;
 
     // assert
     let first_commit = repository
