@@ -18,7 +18,7 @@ fn test_remove_file() -> io::Result<()> {
     rut_testhelpers::rut_commit("Initial commit", &repository)?;
 
     // act
-    rut_testhelpers::rut_rm(&readme, &repository);
+    rut_testhelpers::run_command_string("rm README.md", &repository)?;
 
     // assert
     rut_testhelpers::assert_healthy_repo(&repository.git_dir());

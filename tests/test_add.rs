@@ -17,8 +17,7 @@ fn test_add_directory() -> io::Result<()> {
     fs::write(file_in_nested_dir, "A file.")?;
 
     // act
-    let command = format!("add {}", workdir.to_str().unwrap());
-    rut_testhelpers::run_command_string(command, &repository)?;
+    rut_testhelpers::run_command_string("add .", &repository)?;
 
     // assert
     let index = Index::from_file(repository.git_dir().join("index"))?;
@@ -53,8 +52,7 @@ fn test_adding_file_when_index_is_locked() -> io::Result<()> {
     fs::write(&index_lockfile, ";")?;
 
     // act
-    let command = format!("add {}", readme.to_str().unwrap());
-    let add_result = rut_testhelpers::run_command_string(command, &repository);
+    let add_result = rut_testhelpers::run_command_string("add README.md", &repository);
 
     // assert
     assert!(add_result.is_err());
@@ -87,8 +85,7 @@ fn test_add_removed_file() -> io::Result<()> {
     fs::remove_file(&readme)?;
 
     // act
-    let command = format!("add {}", readme.to_str().unwrap());
-    rut_testhelpers::run_command_string(command, &repository)?;
+    rut_testhelpers::run_command_string("add README.md", &repository)?;
 
     // assert
     let index = repository.load_index_unlocked()?;

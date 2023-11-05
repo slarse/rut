@@ -20,7 +20,7 @@ fn test_diff_shows_modified_unstaged_files() -> io::Result<()> {
     let new_blob = Blob::new(fs::read(&file)?);
 
     // act
-    let output = rut_testhelpers::rut_diff_default(&repository)?;
+    let output = rut_testhelpers::run_command_string("diff", &repository)?;
 
     // assert
     let expected_header = create_expected_header(
@@ -55,7 +55,7 @@ fn test_diff_shows_context_lines() -> io::Result<()> {
     let new_blob = Blob::new(fs::read(&file)?);
 
     // act
-    let output = rut_testhelpers::rut_diff_default(&repository)?;
+    let output = rut_testhelpers::run_command_string("diff", &repository)?;
 
     // assert
     let expected_header = create_expected_header(
@@ -90,7 +90,7 @@ fn test_diff_omits_final_empty_line() -> io::Result<()> {
     let new_blob = Blob::new(new_content.as_bytes().to_vec());
 
     // act
-    let output = rut_testhelpers::rut_diff_default(&repository)?;
+    let output = rut_testhelpers::run_command_string("diff", &repository)?;
 
     // assert
     let expected_header = create_expected_header(
@@ -115,12 +115,7 @@ fn test_diff_cached_shows_staged_changes() -> io::Result<()> {
     let expected_diff = create_committed_file_with_staged_changes(&repository, &file)?;
 
     // act
-    let options = rut::diff::OptionsBuilder::default()
-        .cached(true)
-        .build()
-        .ok()
-        .unwrap();
-    let output = rut_testhelpers::rut_diff(&repository, &options)?;
+    let output = rut_testhelpers::run_command_string("diff --cached", &repository)?;
 
     // assert
     assert_eq!(output, expected_diff);
@@ -139,12 +134,7 @@ fn test_diff_cached_shows_staged_changes_in_subdirectory() -> io::Result<()> {
     let expected_diff = create_committed_file_with_staged_changes(&repository, &file)?;
 
     // act
-    let options = rut::diff::OptionsBuilder::default()
-        .cached(true)
-        .build()
-        .ok()
-        .unwrap();
-    let output = rut_testhelpers::rut_diff(&repository, &options)?;
+    let output = rut_testhelpers::run_command_string("diff --cached", &repository)?;
 
     // assert
     assert_eq!(output, expected_diff);
@@ -163,12 +153,7 @@ fn test_diff_cached_shows_staged_changes_of_new_file() -> io::Result<()> {
     rut_testhelpers::rut_add(&file, &repository);
 
     // act
-    let options = rut::diff::OptionsBuilder::default()
-        .cached(true)
-        .build()
-        .ok()
-        .unwrap();
-    let output = rut_testhelpers::rut_diff(&repository, &options)?;
+    let output = rut_testhelpers::run_command_string("diff --cached", &repository)?;
 
     // assert
     let expected_output = "diff --git a/file.txt b/file.txt
@@ -194,7 +179,7 @@ fn test_diff_deleted_file() -> io::Result<()> {
     fs::remove_file(&file)?;
 
     // act
-    let output = rut_testhelpers::rut_diff_default(&repository)?;
+    let output = rut_testhelpers::run_command_string("diff", &repository)?;
 
     // assert
     let expected_output = "diff --git a/file.txt b/file.txt

@@ -9,9 +9,9 @@ fn test_first_commit_denoted_as_root_commit_in_status_message() -> io::Result<()
 
     // act
     let first_commit_output =
-        rut_testhelpers::rut_commit_with_output_capture("First commit", &repository)?;
+        rut_testhelpers::run_command_string("commit -m 'First commit'", &repository)?;
     let second_commit_output =
-        rut_testhelpers::rut_commit_with_output_capture("Second commit", &repository)?;
+        rut_testhelpers::run_command_string("commit -m 'Second commit'", &repository)?;
 
     assert!(first_commit_output.contains("(root commit)"));
     assert!(!second_commit_output.contains("(root commit)"));
@@ -35,11 +35,11 @@ fn test_creating_commit_with_nested_directory() -> io::Result<()> {
     fs::write(&readme, "A README.")?;
     fs::write(&file_in_nested_dir, "A file.")?;
 
-    // act
     rut_testhelpers::rut_add(&readme, &repository);
     rut_testhelpers::rut_add(&file_in_nested_dir, &repository);
 
-    rut_testhelpers::rut_commit("Initial commit", &repository)?;
+    // act
+    rut_testhelpers::run_command_string("commit -m 'Initial commit'", &repository)?;
 
     // assert
     rut_testhelpers::assert_healthy_repo(&repository.git_dir());

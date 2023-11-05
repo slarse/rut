@@ -10,8 +10,7 @@ fn test_restores_unstaged_file_to_last_commit() -> io::Result<()> {
     fs::write(&file, "more content")?;
 
     // act
-    let command = format!("restore {}", file.to_str().unwrap());
-    rut_testhelpers::run_command_string(command, &repository)?;
+    rut_testhelpers::run_command_string("restore file.txt", &repository)?;
 
     // assert
     let output = fs::read_to_string(&file)?;
