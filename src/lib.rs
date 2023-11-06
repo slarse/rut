@@ -37,4 +37,6 @@ pub mod restore;
 
 pub mod log;
 
+pub mod branch;
+
 mod object_resolver;

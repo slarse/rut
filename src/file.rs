@@ -36,6 +36,14 @@ pub fn atomic_write(path: &Path, content: &[u8]) -> io::Result<()> {
 }
 
 /**
+ * Create a new file and write the content to it. Fail if the file already exists.
+ */
+pub fn create_file(path: &Path, content: &[u8]) -> io::Result<()> {
+    let mut file = OpenOptions::new().create_new(true).write(true).open(path)?;
+    file.write_all(content)
+}
+
+/**
  * Struct that enables synchronized atomic writing to files. On acquiring with a lock with
  * [`LockFile::acquire`] an empty lockfile is created in the file system. You can then use
  * [`LockFile::write`] to write content to the lockfile.

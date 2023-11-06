@@ -3,6 +3,7 @@ use std::fmt::Debug;
 use std::io::{Error, Write};
 use std::os::unix::io::AsRawFd;
 
+use crate::branch;
 use crate::output::{Color, OutputWriter, Style};
 use crate::{add, commit, diff, init, log, restore, rm, status, workspace::Repository};
 use std::io;
@@ -48,6 +49,9 @@ enum Action {
         max_count: Option<u32>,
         #[arg(long)]
         oneline: bool,
+    },
+    Branch {
+        name: Option<String>,
     },
 }
 
@@ -116,6 +120,13 @@ pub fn run_command<P: AsRef<Path>, S: Into<OsString> + Clone>(
                 .build()
                 .unwrap();
             log::log(&repository, &options, writer)?;
+        }
+        Action::Branch { name } => {
+            let options = branch::OptionsBuilder::default()
+                .name(name)
+                .build()
+                .unwrap();
+            branch::branch(&options, &repository)?;
         }
     }
 
