@@ -40,3 +40,24 @@ fn test_error_on_creating_duplicate_branch() -> io::Result<()> {
 
     Ok(())
 }
+
+#[test]
+fn test_error_on_invalid_branch_name() -> io::Result<()> {
+    // arrange
+    let repository = rut_testhelpers::create_repository();
+    rut_testhelpers::rut_commit("Initial commit", &repository)?;
+
+    // act
+    let result = rut_testhelpers::run_command_string("branch ../../etc/passwd", &repository);
+
+    match result {
+        Ok(_) => panic!("expected error on invalid branch name"),
+        Err(error) => {
+            let message = error.to_string();
+            let expected_message = "fatal: '../../etc/passwd' is not a valid branch name";
+            assert_eq!(message, expected_message);
+        }
+    }
+
+    Ok(())
+}

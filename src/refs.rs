@@ -5,6 +5,8 @@ use std::io::ErrorKind;
 use std::path::PathBuf;
 use std::str;
 
+use regex::Regex;
+
 use crate::file;
 use crate::hex;
 use crate::objects::ObjectId;
@@ -15,6 +17,9 @@ pub struct RefHandler<'a> {
 }
 
 const SHA1_SIZE: usize = 40;
+
+const INVALID_BRANCH_NAME_PATTERN: &str =
+    r"^\.|\/\.|\.\.|^\/|\/$|\.lock$|@\{|[\x00-\x20*:?\[\\^~\x7F]";
 
 impl<'a> RefHandler<'a> {
     pub fn new(repository: &Repository) -> RefHandler {
@@ -50,7 +55,7 @@ impl<'a> RefHandler<'a> {
     }
 
     pub fn create_ref(&self, ref_name: &str, object_id: &ObjectId) -> io::Result<()> {
-        let ref_path = self.get_ref_path(ref_name);
+        let ref_path = self.get_ref_path(ref_name)?;
         let hex_string = hex::to_hex_string(object_id.bytes());
         let result = file::create_file(&ref_path, hex_string.as_bytes());
 
@@ -64,10 +69,13 @@ impl<'a> RefHandler<'a> {
         }
     }
 
-    fn get_ref_path(&self, ref_name: &str) -> PathBuf {
-        // TODO validate ref_name, this is currently a security hole because ref_name
-        // could be e.g. `../../etc/passwd`
-        self.repository.git_dir().join("refs/heads/").join(ref_name)
+    fn get_ref_path(&self, ref_name: &str) -> io::Result<PathBuf> {
+        let re = Regex::new(INVALID_BRANCH_NAME_PATTERN).unwrap();
+        if re.is_match(ref_name) {
+            let message = format!("fatal: '{}' is not a valid branch name", ref_name);
+            return Err(Error::new(ErrorKind::Other, message));
+        }
+        Ok(self.repository.git_dir().join("refs/heads/").join(ref_name))
     }
 
     /**
