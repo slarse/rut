@@ -11,8 +11,6 @@ use std::process::{Child, Command, Stdio};
 
 use clap::{Parser, Subcommand};
 
-const PRE_PAGER_BUFFER_SIZE: usize = 50;
-
 #[derive(Parser, Debug)]
 struct Args {
     #[command(subcommand)]
@@ -127,7 +125,12 @@ pub fn run_command<P: AsRef<Path>, S: Into<OsString> + Clone>(
 pub struct StdoutWriter {
     isatty: bool,
     pager: Option<Child>,
-    pre_pager_buffer: Option<Vec<String>>,
+}
+
+impl Default for StdoutWriter {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 extern "C" {
@@ -138,7 +141,10 @@ impl StdoutWriter {
     pub fn new() -> Self {
         let stdout_fd = io::stdout().as_raw_fd();
         let isatty = unsafe { isatty(stdout_fd) } != 0;
-        Self { isatty, pager: None, pre_pager_buffer: Some(vec![]) }
+        Self {
+            isatty,
+            pager: Self::create_pager(),
+        }
     }
 
     fn print_ansi_code(&mut self, ansi_code: &str) -> io::Result<&mut dyn OutputWriter> {
@@ -149,34 +155,20 @@ impl StdoutWriter {
         self.write(format!("\x1b[{}m", ansi_code))
     }
 
-    fn attach_pager(&mut self) -> &mut Self {
-        self.pager = Some(
+    fn create_pager() -> Option<Child> {
+        Some(
             Command::new("less")
                 .arg("-R")
+                .arg("-F")
                 .stdin(Stdio::piped())
                 .spawn()
                 .unwrap(),
-        );
-        return self;
-    }
-
-    fn flush_buffer(&mut self) {
-        let buffer = self.pre_pager_buffer.take().unwrap();
-        if self.isatty && buffer.len() > PRE_PAGER_BUFFER_SIZE {
-            self.attach_pager();
-        }
-
-        for line in buffer {
-            self.write(line).unwrap();
-        }
+        )
     }
 }
 
 impl Drop for StdoutWriter {
     fn drop(&mut self) {
-        if self.pre_pager_buffer.is_some() {
-            self.flush_buffer();
-        }
         if let Some(ref mut pager) = self.pager {
             pager.wait().unwrap();
         }
@@ -185,12 +177,7 @@ impl Drop for StdoutWriter {
 
 impl OutputWriter for StdoutWriter {
     fn write(&mut self, content: String) -> io::Result<&mut dyn OutputWriter> {
-        if let Some(ref mut buffer) = self.pre_pager_buffer {
-            buffer.push(content);
-            if buffer.len() > PRE_PAGER_BUFFER_SIZE {
-                self.flush_buffer();
-            }
-        } else if let Some(ref mut pager) = self.pager {
+        if let Some(ref mut pager) = self.pager {
             pager
                 .stdin
                 .as_mut()
