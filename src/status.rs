@@ -161,11 +161,11 @@ fn write_human_readable(
     if !staged_changes.is_empty() {
         writer.writeln("Changes to be committed:".to_string())?;
 
-        writer.set_color(Color::Green)?;
         for change in staged_changes {
+            writer.set_color(Color::Green)?;
             writer.writeln(format!("\t{}", change.human_readable_format()))?;
+            writer.reset_formatting()?;
         }
-        writer.reset_formatting()?;
 
         written = true;
     }
@@ -176,11 +176,11 @@ fn write_human_readable(
         }
 
         writer.writeln("Changes not staged for commit:".to_string())?;
-        writer.set_color(Color::Red)?;
         for change in unstaged_changes {
+            writer.set_color(Color::Red)?;
             writer.writeln(format!("\t{}", change.human_readable_format()))?;
+            writer.reset_formatting()?;
         }
-        writer.reset_formatting()?;
 
         written = true;
     }
