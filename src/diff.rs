@@ -394,21 +394,19 @@ fn drain_context_into_chunk<'b, 'a: 'b, S: Eq>(
     chunk_content.extend(context.drain(..).skip(context_to_skip));
 }
 
-/**
- * Computes a diff between two arbitrary sequences. The typical thing to use would be two lists of
- * strings, where each element represents a line.
- *
- * ```
- * use rut::diff;
- *
- * let a = "First line\nSecond line\nThird line".split('\n').collect::<Vec<&str>>();
- * let b = "Second line\nThird line\nFourth line".split('\n').collect::<Vec<&str>>();
- *
- * let diff = diff::diff(&a, &b);
- *
- * assert_eq!(diff, "-First line\n Second line\n Third line\n+Fourth line\n");
- * ```
- */
+/// Computes a diff between two arbitrary sequences. The typical thing to use would be two lists of
+/// strings, where each element represents a line.
+///
+/// ```
+/// use rut::diff;
+///
+/// let a = "First line\nSecond line\nThird line".split('\n').collect::<Vec<&str>>();
+/// let b = "Second line\nThird line\nFourth line".split('\n').collect::<Vec<&str>>();
+///
+/// let diff = diff::diff(&a, &b);
+///
+/// assert_eq!(diff, "-First line\n Second line\n Third line\n+Fourth line\n");
+/// ```
 pub fn diff<S: Eq + Copy + Display>(a: &[S], b: &[S]) -> String {
     let edit_script = edit_script(a, b);
     let mut result = String::new();
@@ -430,30 +428,28 @@ pub fn diff<S: Eq + Copy + Display>(a: &[S], b: &[S]) -> String {
     result
 }
 
-/**
- * Computes an edit script between two arbitrary sequences.
- *
- * Example:
- * ```
- * use rut::diff;
- * use rut::diff::{Edit, EditKind};
- *
- * let a = "ABC".chars().collect::<Vec<char>>();
- * let b = "BBD".chars().collect::<Vec<char>>();
- *
- * let expected_edits = vec![
- *     Edit::deletion('A', 0),
- *     Edit::equal('B', 1, 0),
- *     Edit::deletion('C', 2),
- *     Edit::addition('B', 1),
- *     Edit::addition('D', 2),
- * ];
- *
- * let edit_script = diff::edit_script(&a, &b);
- *
- * assert_eq!(edit_script, expected_edits);
- * ```
- */
+/// Computes an edit script between two arbitrary sequences.
+///
+/// Example:
+/// ```
+/// use rut::diff;
+/// use rut::diff::{Edit, EditKind};
+///
+/// let a = "ABC".chars().collect::<Vec<char>>();
+/// let b = "BBD".chars().collect::<Vec<char>>();
+///
+/// let expected_edits = vec![
+///     Edit::deletion('A', 0),
+///     Edit::equal('B', 1, 0),
+///     Edit::deletion('C', 2),
+///     Edit::addition('B', 1),
+///     Edit::addition('D', 2),
+/// ];
+///
+/// let edit_script = diff::edit_script(&a, &b);
+///
+/// assert_eq!(edit_script, expected_edits);
+/// ```
 pub fn edit_script<S: Eq + Copy>(a: &[S], b: &[S]) -> Vec<Edit<S>> {
     let (final_k_value, edit_path_graph) = compute_edit_path_graph(a, b);
     let reversed_edit_trace = trace_edit_points(final_k_value, edit_path_graph);
@@ -577,10 +573,8 @@ fn trace_edit_points(final_k: i32, trace: Vec<Vec<usize>>) -> Vec<(i32, i32)> {
     edit_points
 }
 
-/**
- * Compute the previous k-value in the edit path graph. This function is optimized for
- * understandability rather than performance, it can easily be compressed into a single condition.
- */
+/// Compute the previous k-value in the edit path graph. This function is optimized for
+/// understandability rather than performance, it can easily be compressed into a single condition.
 fn compute_previous_k(k: i32, d: i32, v: &[usize]) -> i32 {
     if k == -d {
         // the previous move must have been from a larger k as abs(k) <= d
@@ -631,17 +625,13 @@ fn compute_edit_script<S: Eq + Copy>(
     edits
 }
 
-/**
- * Get a value from the vector with support for negative indexing.
- */
+/// Get a value from the vector with support for negative indexing.
 fn get<S>(iterable: &[S], index: i32) -> &S {
     let adjusted_index = adjust_index(iterable, index);
     iterable.get(adjusted_index).unwrap()
 }
 
-/**
- * Set a value in the vector with support for negative indexing.
- */
+/// Set a value in the vector with support for negative indexing.
 fn set<S>(iterable: &mut [S], index: i32, value: S) {
     let adjusted_index = adjust_index(iterable, index);
     iterable[adjusted_index] = value

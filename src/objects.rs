@@ -25,62 +25,54 @@ pub trait GitObject<'a> {
     fn to_object_format(&self) -> Vec<u8>;
 }
 
-/**
- * A Git object id is the sha1 hash of the object's content, which is represented as a 40 byte
- * hexadecimal string. This struct encapsulates this concept and provides some utility methods
- * related to common operations on object ids, such as finding out the filepath in the object
- * database.
- */
+/// A Git object id is the sha1 hash of the object's content, which is represented as a 40 byte
+/// hexadecimal string. This struct encapsulates this concept and provides some utility methods
+/// related to common operations on object ids, such as finding out the filepath in the object
+/// database.
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct ObjectId {
     bytes: Vec<u8>,
 }
 
 impl ObjectId {
-    /**
-     * Turn a hexadecimal string into an ObjectId. This is the inverse of to_string().
-     *
-     * # Examples
-     * ```
-     * use rut::objects::ObjectId;
-     *
-     * let id = ObjectId::from_sha("a94a8fe5ccb19ba61c4c0873d391e987982fbbd3").unwrap();
-     * assert_eq!(id.to_string(), "a94a8fe5ccb19ba61c4c0873d391e987982fbbd3");
-     * ```
-     */
+    /// Turn a hexadecimal string into an ObjectId. This is the inverse of to_string().
+    /// 
+    /// # Examples
+    /// ```
+    /// use rut::objects::ObjectId;
+    /// 
+    /// let id = ObjectId::from_sha("a94a8fe5ccb19ba61c4c0873d391e987982fbbd3").unwrap();
+    /// assert_eq!(id.to_string(), "a94a8fe5ccb19ba61c4c0873d391e987982fbbd3");
+    /// ```
     pub fn from_sha(s: &str) -> Result<ObjectId, String> {
         let bytes = hex::from_hex_string(s).map_err(|e| e.to_string())?;
         Self::from_sha_bytes(&bytes)
     }
 
-    /**
-     * Turn a string that is the utf8 encoded version of a sha1 hash into an ObjectId.
-     *
-     * # Examples
-     * ```
-     * use rut::objects::ObjectId;
-     *
-     * let bytes = "a94a8fe5ccb19ba61c4c0873d391e987982fbbd3".as_bytes();
-     * let id = ObjectId::from_utf8_encoded_sha(bytes).unwrap();
-     * assert_eq!(id.to_string(), "a94a8fe5ccb19ba61c4c0873d391e987982fbbd3");
-     * ```
-     */
+    /// Turn a string that is the utf8 encoded version of a sha1 hash into an ObjectId.
+    /// 
+    /// # Examples
+    /// ```
+    /// use rut::objects::ObjectId;
+    /// 
+    /// let bytes = "a94a8fe5ccb19ba61c4c0873d391e987982fbbd3".as_bytes();
+    /// let id = ObjectId::from_utf8_encoded_sha(bytes).unwrap();
+    /// assert_eq!(id.to_string(), "a94a8fe5ccb19ba61c4c0873d391e987982fbbd3");
+    /// ```
     pub fn from_utf8_encoded_sha(bytes: &[u8]) -> Result<ObjectId, String> {
         let s = str::from_utf8(bytes).map_err(|e| e.to_string())?;
         Self::from_sha(s)
     }
 
-    /**
-     * Turn bytes into an ObjectId. This is the inverse of bytes().
-     *
-     * # Examples
-     * ```
-     * use rut::objects::ObjectId;
-     *
-     * let bytes = "a94a8fe5ccb19ba61c4c0873d391e987982fbbd3".as_bytes();
-     * let id = ObjectId::from_sha_bytes(bytes).unwrap();
-     * assert_eq!(id.bytes(), bytes);
-     */
+    /// Turn bytes into an ObjectId. This is the inverse of bytes().
+    /// 
+    /// # Examples
+    /// ```
+    /// use rut::objects::ObjectId;
+    /// 
+    /// let bytes = "a94a8fe5ccb19ba61c4c0873d391e987982fbbd3".as_bytes();
+    /// let id = ObjectId::from_sha_bytes(bytes).unwrap();
+    /// assert_eq!(id.bytes(), bytes);
     pub fn from_sha_bytes(bytes: &[u8]) -> Result<ObjectId, String> {
         let unhexlified_bytes = if bytes.len() == 20 {
             hex::unhexlify(bytes)

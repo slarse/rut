@@ -39,9 +39,7 @@ impl<'a> ObjectResolver<'a> {
         Ok(ObjectResolver::new(root_tree, &repository.database))
     }
 
-    /**
-     * Find a blob by its path, relative to the root tree of this ObjectResolver.
-     */
+    /// Find a blob by its path, relative to the root tree of this ObjectResolver.
     pub fn find_blob_by_path(&mut self, path: &Path) -> io::Result<Blob> {
         if let Some(blob) = self.blobs.get(path) {
             return Ok(blob.clone());
@@ -73,9 +71,7 @@ impl<'a> ObjectResolver<'a> {
         self.find_blob_in_subtree(parent_path, remaining_path)
     }
 
-    /**
-     * Recursively find a blob in a subtree. Cache any trees found along the way.
-     */
+    /// Recursively find a blob in a subtree. Cache any trees found along the way.
     fn find_blob_in_subtree(
         &mut self,
         parent_path: &Path,
@@ -104,9 +100,7 @@ impl<'a> ObjectResolver<'a> {
         self.find_blob_in_tree_(&current_path, &curent_remaining_path)
     }
 
-    /**
-     * Get a blob assuming its parent tree is already cached.
-     */
+    /// Get a blob assuming its parent tree is already cached.
     fn get_blob(&mut self, blob_path: &Path) -> io::Result<Blob> {
         let file_name = blob_path.file_name().unwrap().to_str().unwrap();
         let tree = &self.trees[blob_path.parent().unwrap()];

@@ -467,12 +467,10 @@ fn resolve_unstaged_modifications<'a>(
         })
 }
 
-/**
- * Returns true if the file at the given path has been modified since the last commit.
- *
- * Side effect: Updates the index with new mtimes if they've been updatet without the content being
- * changed.
- */
+/// Returns true if the file at the given path has been modified since the last commit.
+///
+/// Side effect: Updates the index with new mtimes if they've been updatet without the content being
+/// changed.
 fn is_modified(absolute_path: &Path, tracked_path: &Path, index: &mut Index) -> io::Result<bool> {
     let is_modified = if let Some(index_entry) = index.get_mut(tracked_path) {
         let metadata = fs::metadata(absolute_path)?;

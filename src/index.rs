@@ -175,14 +175,12 @@ impl Index {
         }
     }
 
-    /**
-     * We need to discard any new entries that conflict with existing ones. For example, given an
-     * existing entry `file.txt`, adding a new entry for `file.txt/nested.txt` (i.e. there's now a
-     * directory called `file.txt` with a file `nested.txt` in it), we need to remove `file.txt`.
-     *
-     * Similarly, given an existing entry `nested/dir/file.txt` and adding an entry `nested`, we
-     * expect `nested/dir/file.txt` to be removed from the index.
-     */
+    /// We need to discard any new entries that conflict with existing ones. For example, given an
+    /// existing entry `file.txt`, adding a new entry for `file.txt/nested.txt` (i.e. there's now a
+    /// directory called `file.txt` with a file `nested.txt` in it), we need to remove `file.txt`.
+    /// 
+    /// Similarly, given an existing entry `nested/dir/file.txt` and adding an entry `nested`, we
+    /// expect `nested/dir/file.txt` to be removed from the index.
     fn discard_conflicting_entries<P: AsRef<Path>>(&mut self, path: P) {
         self.remove_directory(&path);
         for parent in path.as_ref().ancestors() {
@@ -199,16 +197,12 @@ impl Index {
         }
     }
 
-    /**
-     * Check whether a path exists as an entry in the index.
-     */
+    /// Check whether a path exists as an entry in the index.
     pub fn has_entry<P: AsRef<Path>>(&self, path: P) -> bool {
         self.entries.contains_key(path.as_ref())
     }
 
-    /**
-     * Check whether a path is a tracked directory.
-     */
+    /// Check whether a path is a tracked directory.
     pub fn is_tracked_directory<P: AsRef<Path>>(&self, path: P) -> bool {
         self.directories.contains_key(path.as_ref())
     }

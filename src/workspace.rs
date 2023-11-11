@@ -488,16 +488,12 @@ impl Worktree {
         }
     }
 
-    /**
-     * Absolute path to the root of the worktree.
-     */
+    /// Absolute path to the root of the worktree.
     pub fn root(&self) -> &Path {
         &self.root
     }
 
-    /**
-     * Return the path relative to the root of this worktree.
-     */
+    /// Return the path relative to the root of this worktree.
     pub fn relativize_path<P: AsRef<Path>>(&self, absolute_path: P) -> PathBuf {
         let relative_path = absolute_path
             .as_ref()

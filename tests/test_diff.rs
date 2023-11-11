@@ -221,12 +221,10 @@ fn create_committed_file_with_staged_changes(
     Ok(expected_output)
 }
 
-/**
- * When writing tiny files in tests, there may not be enough time between writes to make for
- * different timestamps between the writes. We therefore need to sleep a tiny amount before
- * making a new write where there is a necessity to have it happen "strictly after" a previous
- * write to the same file.
- */
+/// When writing tiny files in tests, there may not be enough time between writes to make for
+/// different timestamps between the writes. We therefore need to sleep a tiny amount before
+/// making a new write where there is a necessity to have it happen "strictly after" a previous
+/// write to the same file.
 fn wait_for_new_timestamp() {
     thread::sleep(std::time::Duration::from_millis(10));
 }

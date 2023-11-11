@@ -16,10 +16,8 @@ pub fn read_file<P: AsRef<Path>>(path: P) -> io::Result<Vec<u8>> {
     Ok(bytes)
 }
 
-/**
- * Atomically write to a file by first writing to a temporary file and then renaming it to the
- * target file.
- */
+/// Atomically write to a file by first writing to a temporary file and then renaming it to the
+/// target file.
 pub fn atomic_write(path: &Path, content: &[u8]) -> io::Result<()> {
     let mut buffer_file = PathBuf::from(path);
     let buffer_file_extension = format!(
@@ -35,23 +33,19 @@ pub fn atomic_write(path: &Path, content: &[u8]) -> io::Result<()> {
     fs::rename(&buffer_file, path)
 }
 
-/**
- * Create a new file and write the content to it. Fail if the file already exists.
- */
+/// Create a new file and write the content to it. Fail if the file already exists.
 pub fn create_file(path: &Path, content: &[u8]) -> io::Result<()> {
     let mut file = OpenOptions::new().create_new(true).write(true).open(path)?;
     file.write_all(content)
 }
 
-/**
- * Struct that enables synchronized atomic writing to files. On acquiring with a lock with
- * [`LockFile::acquire`] an empty lockfile is created in the file system. You can then use
- * [`LockFile::write`] to write content to the lockfile.
- *
- * When the [`LockFile`] goes out of scope, the lockfile itself is renamed to the target file for
- * which the lock was acquired. Renames are atomic operations, so there is no risk that someone
- * reading the file without acquiring the lock gets a partially written result.
- */
+/// Struct that enables synchronized atomic writing to files. On acquiring with a lock with
+/// [`LockFile::acquire`] an empty lockfile is created in the file system. You can then use
+/// [`LockFile::write`] to write content to the lockfile.
+/// 
+/// When the [`LockFile`] goes out of scope, the lockfile itself is renamed to the target file for
+/// which the lock was acquired. Renames are atomic operations, so there is no risk that someone
+/// reading the file without acquiring the lock gets a partially written result.
 pub struct LockFile {
     path: PathBuf,
     lockfile: File,
@@ -195,12 +189,10 @@ pub trait AsVec<T> {
     fn as_vec(&self) -> Vec<T>;
 }
 
-/**
- * A resource backed by a lockfile. The final write is atomically transferred to the original file
- * when this struct is destroyed.
- *
- * Do note that any intermediate writes are simply discarded.
- */
+/// A resource backed by a lockfile. The final write is atomically transferred to the original file
+/// when this struct is destroyed.
+/// 
+/// Do note that any intermediate writes are simply discarded.
 pub struct LockFileResource<T: AsVec<u8>> {
     lockfile: LockFile,
     resource: T,
@@ -211,10 +203,8 @@ impl<T: AsVec<u8>> LockFileResource<T> {
         LockFileResource { lockfile, resource }
     }
 
-    /**
-     * Write the resource to the lockfile. The final write to the lockfile are committed to the
-     * original resource once this struct is destroyed.
-     */
+    /// Write the resource to the lockfile. The final write to the lockfile are committed to the
+    /// original resource once this struct is destroyed.
     pub fn write(&mut self) -> io::Result<()> {
         self.lockfile.write(&self.resource.as_vec())
     }
