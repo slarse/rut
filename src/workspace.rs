@@ -473,7 +473,7 @@ impl Repository {
         let head_file = self.git_dir().join("HEAD");
         let head_content = fs::read_to_string(head_file)?;
         let trimmed_head_content = head_content.trim();
-        Ok(trimmed_head_content.trim_start_matches("ref: ").to_owned())
+        Ok(trimmed_head_content.trim_start_matches("ref: refs/heads/").to_owned())
     }
 }
 

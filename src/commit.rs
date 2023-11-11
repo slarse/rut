@@ -29,7 +29,8 @@ pub fn commit(
     let commit = create_commit(repository, index.as_mut(), &head_ref)?;
     repository.database.store_object(&commit)?;
 
-    fs::write(repository.git_dir().join(&head_ref), commit.id_as_string())?;
+    let ref_handler = RefHandler::new(repository);
+    ref_handler.write_ref(&head_ref, commit.id())?;
 
     write_commit_status(&commit, writer)?;
 

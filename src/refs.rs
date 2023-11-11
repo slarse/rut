@@ -54,6 +54,12 @@ impl<'a> RefHandler<'a> {
             .map_err(|parse_error| Error::new(io::ErrorKind::Other, parse_error))
     }
 
+    pub fn write_ref(&self, ref_name: &str, object_id: &ObjectId) -> io::Result<()> {
+        let ref_path = self.get_ref_path(ref_name)?;
+        let hex_string = hex::to_hex_string(object_id.bytes());
+        file::atomic_write(&ref_path, hex_string.as_bytes())
+    }
+
     pub fn create_ref(&self, ref_name: &str, object_id: &ObjectId) -> io::Result<()> {
         let ref_path = self.get_ref_path(ref_name)?;
         let hex_string = hex::to_hex_string(object_id.bytes());
