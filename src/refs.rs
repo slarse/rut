@@ -1,9 +1,11 @@
+use std::fmt;
 use std::fs;
 use std::io;
 use std::io::Error;
 use std::io::ErrorKind;
 use std::path::PathBuf;
 use std::str;
+use std::str::FromStr;
 
 use regex::Regex;
 
@@ -21,14 +23,15 @@ const SHA1_SIZE: usize = 40;
 const INVALID_BRANCH_NAME_PATTERN: &str =
     r"^\.|\/\.|\.\.|^\/|\/$|\.lock$|@\{|[\x00-\x20*:?\[\\^~\x7F]";
 
+const PARENT_PATTERN: &str = r"^(.*)\^$";
+const ANCESTOR_PATTERN: &str = r"^(.*)~(\d+)$";
+
 impl<'a> RefHandler<'a> {
     pub fn new(repository: &Repository) -> RefHandler {
         RefHandler { repository }
     }
 
-    /**
-     * Dereference a Git ref.
-     */
+    /// Dereference a reference to an object id.
     pub fn deref(&self, reference: &str) -> io::Result<ObjectId> {
         if reference == "HEAD" {
             return self.head();
@@ -84,11 +87,125 @@ impl<'a> RefHandler<'a> {
         Ok(self.repository.git_dir().join("refs/heads/").join(ref_name))
     }
 
-    /**
-     * Convenience method to get the current head commit.
-     */
+    /// Convenience method to get the object id of the current HEAD.
     pub fn head(&self) -> io::Result<ObjectId> {
         let head = self.repository.head()?;
         self.deref(&head)
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub enum ParseRevisionError {
+    InvalidFormat(String),
+    // You can add more specific error types as needed
+}
+
+impl fmt::Display for ParseRevisionError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            ParseRevisionError::InvalidFormat(input) => {
+                write!(f, "Invalid revision format: {}", input)
+            }
+        }
+    }
+}
+
+impl std::error::Error for ParseRevisionError {}
+
+#[derive(Debug, PartialEq)]
+pub enum Revision {
+    Reference(String),
+    Parent(Box<Revision>),
+    Ancestor(Box<Revision>, u32),
+}
+
+impl Revision {
+    ///
+    /// Parse a revision from a string.
+    ///
+    /// # Examples:
+    ///
+    /// ```
+    /// use rut::refs::Revision;
+    ///
+    /// let revision = Revision::parse("HEAD").unwrap();
+    /// assert_eq!(revision, Revision::Reference("HEAD".to_owned()));
+    ///
+    /// let parent_revision = Revision::parse("HEAD^").unwrap();
+    /// assert_eq!(
+    ///   parent_revision,
+    ///   Revision::Parent(Box::new(Revision::Reference("HEAD".to_owned())))
+    /// );
+    ///
+    /// let ancestor_revision = Revision::parse("HEAD~3").unwrap();
+    /// assert_eq!(
+    ///   ancestor_revision,
+    ///   Revision::Ancestor(Box::new(Revision::Reference("HEAD".to_owned())), 3)
+    /// );
+    /// ```
+    ///
+    pub fn parse(s: &str) -> Result<Revision, ParseRevisionError> {
+        let invalid_regex = Regex::new(INVALID_BRANCH_NAME_PATTERN).unwrap();
+        let parent_regex = Regex::new(PARENT_PATTERN).unwrap();
+        let ancestor_regex = Regex::new(ANCESTOR_PATTERN).unwrap();
+        let err = ParseRevisionError::InvalidFormat(s.to_owned());
+
+        if let Some(group) = parent_regex.captures(s).map(|g| g.get(1)).flatten() {
+            let nested_rev = Revision::parse(group.as_str())?;
+            Ok(Revision::Parent(Box::new(nested_rev)))
+        } else if let Some(matches) = ancestor_regex.captures(s) {
+            let nested_rev = Revision::parse(matches.get(1).unwrap().as_str())?;
+            let count = matches
+                .get(2)
+                .unwrap()
+                .as_str()
+                .parse::<u32>()
+                .map_err(|_| err)?;
+            Ok(Revision::Ancestor(Box::new(nested_rev), count))
+        } else if !invalid_regex.is_match(s) {
+            Ok(Revision::Reference(s.to_owned()))
+        } else {
+            Err(err)
+        }
+    }
+}
+
+impl FromStr for Revision {
+    type Err = ParseRevisionError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Revision::parse(s)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_parent_revision() {
+        let revision = Revision::parse("HEAD^").unwrap();
+        assert_eq!(
+            revision,
+            Revision::Parent(Box::new(Revision::Reference("HEAD".to_owned())))
+        );
+    }
+
+    #[test]
+    fn test_parse_ancestor_revision() {
+        let revision = Revision::parse("HEAD~3").unwrap();
+        assert_eq!(
+            revision,
+            Revision::Ancestor(Box::new(Revision::Reference("HEAD".to_owned())), 3)
+        );
+    }
+
+    #[test]
+    fn test_parse_error() {
+        let parsed = Revision::parse("/HEAD~3");
+        assert_eq!(
+            parsed,
+            Err(ParseRevisionError::InvalidFormat("/HEAD".to_owned()))
+        );
     }
 }

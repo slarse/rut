@@ -25,7 +25,7 @@ mod file;
 
 pub mod rm;
 
-mod refs;
+pub mod refs;
 
 pub mod output;
 
