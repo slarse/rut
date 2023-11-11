@@ -191,9 +191,11 @@ fn write_human_readable(
         }
 
         writer.writeln("Untracked files:".to_string())?;
-        writer.set_color(Color::Red)?;
-        print_paths("\t", untracked_paths, worktree, writer)?;
-        writer.reset_formatting()?;
+        for untracked in untracked_paths {
+            writer.set_color(Color::Red)?;
+            print_path("\t", untracked, worktree, writer)?;
+            writer.reset_formatting()?;
+        }
     }
 
     writer.writeln("".to_string())?;
@@ -223,16 +225,26 @@ fn print_paths(
     let mut sorted_paths = paths.iter().collect::<Vec<&PathBuf>>();
     sorted_paths.sort();
     for path in sorted_paths {
-        let relative_path = worktree.relativize_path(path);
-        let suffix = if path.is_dir() { "/" } else { "" };
-        let line = format!(
-            "{}{}{}",
-            prefix,
-            relative_path.as_os_str().to_str().unwrap(),
-            suffix
-        );
-        writer.writeln(line)?;
+        print_path(prefix, path, worktree, writer)?;
     }
+    Ok(())
+}
+
+fn print_path(
+    prefix: &str,
+    path: &PathBuf,
+    worktree: &Worktree,
+    writer: &mut dyn OutputWriter,
+) -> io::Result<()> {
+    let relative_path = worktree.relativize_path(path);
+    let suffix = if path.is_dir() { "/" } else { "" };
+    let line = format!(
+        "{}{}{}",
+        prefix,
+        relative_path.as_os_str().to_str().unwrap(),
+        suffix
+    );
+    writer.writeln(line)?;
     Ok(())
 }
 

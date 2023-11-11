@@ -40,3 +40,5 @@ pub mod log;
 pub mod branch;
 
 mod object_resolver;
+
+pub mod revparse;

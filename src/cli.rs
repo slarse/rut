@@ -3,7 +3,7 @@ use std::fmt::Debug;
 use std::io::{Error, Write};
 use std::os::unix::io::AsRawFd;
 
-use crate::branch;
+use crate::{branch, revparse};
 use crate::output::{Color, OutputWriter, Style};
 use crate::{add, commit, diff, init, log, restore, rm, status, workspace::Repository};
 use std::io;
@@ -52,6 +52,9 @@ enum Action {
     },
     Branch {
         name: Option<String>,
+    },
+    RevParse {
+        revision: String,
     },
 }
 
@@ -127,6 +130,9 @@ pub fn run_command<P: AsRef<Path>, S: Into<OsString> + Clone>(
                 .build()
                 .unwrap();
             branch::branch(&options, &repository)?;
+        }
+        Action::RevParse { revision } => {
+            revparse::rev_parse(&revision, writer, &repository)?;
         }
     }
 

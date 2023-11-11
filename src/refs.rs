@@ -168,6 +168,38 @@ impl Revision {
             Err(err)
         }
     }
+
+    pub fn resolve(&self, repository: &Repository) -> io::Result<ObjectId> {
+        let refs = RefHandler::new(repository);
+
+        let err = |revision: &Revision| {
+            Error::new(
+                ErrorKind::Other,
+                format!("fatal: ambiguous argument '{:?}': unknown revision", revision),
+            )
+        };
+
+        match self {
+            Revision::Reference(reference) => refs.deref(reference),
+            Revision::Parent(revision) => {
+                let oid = revision.resolve(repository)?;
+                let commit = repository.database.load_commit(&oid)?;
+                commit.parent.ok_or_else(|| { err(revision) })
+            }
+            Revision::Ancestor(revision, count) => {
+                let oid = revision.resolve(repository)?;
+                let commit = repository.database.load_commit(&oid)?;
+                let mut parent_oid = commit.parent.ok_or_else(|| { err(revision) })?;
+
+                for _ in 1..*count {
+                    let parent_commit = repository.database.load_commit(&parent_oid)?;
+                    parent_oid = parent_commit.parent.ok_or_else(|| { err(revision) })?;
+                }
+
+                Ok(parent_oid)
+            }
+        }
+    }
 }
 
 impl FromStr for Revision {
