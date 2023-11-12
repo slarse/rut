@@ -22,12 +22,15 @@ use shlex;
 pub fn run_command<S: Into<OsString> + Clone + From<&'static str>>(
     args: Vec<S>,
     repository: &Repository,
-) -> io::Result<String> {
+) -> rut::Result<String> {
     let mut writer = CapturingOutputWriter {
         output: String::new(),
     };
-    
-    let has_rut = args.get(0).map(|arg| arg.to_owned().into() == "rut").unwrap_or(false);
+
+    let has_rut = args
+        .get(0)
+        .map(|arg| arg.to_owned().into() == "rut")
+        .unwrap_or(false);
     let complete_args = if has_rut {
         args
     } else {
@@ -40,7 +43,7 @@ pub fn run_command<S: Into<OsString> + Clone + From<&'static str>>(
     Ok(writer.output)
 }
 
-pub fn run_command_string<S: AsRef<str>>(args: S, repository: &Repository) -> io::Result<String> {
+pub fn run_command_string<S: AsRef<str>>(args: S, repository: &Repository) -> rut::Result<String> {
     let args = shlex::split(args.as_ref())
         .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "Failed to split arguments"))?;
     let result = run_command(args, repository)?;
@@ -50,7 +53,7 @@ pub fn run_command_string<S: AsRef<str>>(args: S, repository: &Repository) -> io
 pub fn rut_commit_with_output_capture(
     commit_message: &str,
     repository: &Repository,
-) -> io::Result<String> {
+) -> rut::Result<String> {
     let mut output_writer = CapturingOutputWriter {
         output: String::new(),
     };
@@ -62,7 +65,7 @@ pub fn rut_commit_with_output_capture(
     Ok(output_writer.output)
 }
 
-pub fn rut_commit(commit_message: &str, repository: &Repository) -> io::Result<String> {
+pub fn rut_commit(commit_message: &str, repository: &Repository) -> rut::Result<String> {
     fs::write(&repository.git_dir().join("COMMIT_EDITMSG"), commit_message)?;
     let options = commit::OptionsBuilder::default()
         .message(Some(commit_message.to_owned()))
@@ -158,7 +161,7 @@ pub fn rut_init(repository: &Repository) {
     init::init(repository.git_dir(), &mut NoopOutputWriter).expect("Failed to initialize repo");
 }
 
-pub fn rut_status_porcelain(repository: &Repository) -> io::Result<String> {
+pub fn rut_status_porcelain(repository: &Repository) -> rut::Result<String> {
     let mut output_writer = CapturingOutputWriter {
         output: String::new(),
     };
@@ -171,7 +174,7 @@ pub fn rut_status_porcelain(repository: &Repository) -> io::Result<String> {
     Ok(output_writer.output)
 }
 
-pub fn rut_status(repository: &Repository, options: &status::Options) -> io::Result<String> {
+pub fn rut_status(repository: &Repository, options: &status::Options) -> rut::Result<String> {
     let mut output_writer = CapturingOutputWriter {
         output: String::new(),
     };
@@ -188,12 +191,12 @@ pub fn rut_restore(
     Ok(())
 }
 
-pub fn rut_diff_default(repository: &Repository) -> io::Result<String> {
+pub fn rut_diff_default(repository: &Repository) -> rut::Result<String> {
     let options = Default::default();
     rut_diff(repository, &options)
 }
 
-pub fn rut_diff(repository: &Repository, options: &diff::Options) -> io::Result<String> {
+pub fn rut_diff(repository: &Repository, options: &diff::Options) -> rut::Result<String> {
     let mut output_writer = CapturingOutputWriter {
         output: String::new(),
     };
@@ -242,7 +245,7 @@ pub fn commit_content(
     file: &Path,
     content: &str,
     commit_message: &str,
-) -> io::Result<String> {
+) -> rut::Result<String> {
     fs::write(file, content)?;
     rut_add(file, repository);
     rut_commit(commit_message, repository)

@@ -56,32 +56,31 @@ impl<'a> RefHandler<'a> {
         ObjectId::from_sha(&result).map_err(|err| Error::new(io::ErrorKind::Other, err.to_string()))
     }
 
-    pub fn write_ref(&self, ref_name: &str, object_id: &ObjectId) -> io::Result<()> {
+    pub fn write_ref(&self, ref_name: &str, object_id: &ObjectId) -> crate::Result<()> {
         let ref_path = self.get_ref_path(ref_name)?;
         let hex_string = hex::to_hex_string(object_id.bytes());
-        file::atomic_write(&ref_path, hex_string.as_bytes())
+        Ok(file::atomic_write(&ref_path, hex_string.as_bytes())?)
     }
 
-    pub fn create_ref(&self, ref_name: &str, object_id: &ObjectId) -> io::Result<()> {
+    pub fn create_ref(&self, ref_name: &str, object_id: &ObjectId) -> crate::Result<()> {
         let ref_path = self.get_ref_path(ref_name)?;
         let hex_string = hex::to_hex_string(object_id.bytes());
         let result = file::create_file(&ref_path, hex_string.as_bytes());
 
         match result {
-            ok @ Ok(_) => ok,
             Err(error) if error.kind() == ErrorKind::AlreadyExists => {
-                let message = format!("fatal: a branch named '{}' already exists", ref_name);
-                Err(io::Error::new(io::ErrorKind::Other, message))
+                let message = format!("a branch named '{}' already exists", ref_name);
+                return Err(crate::Error::Fatal(Some(Box::new(error)), message));
             }
-            err => err,
+            other => return Ok(other?),
         }
     }
 
-    fn get_ref_path(&self, ref_name: &str) -> io::Result<PathBuf> {
+    fn get_ref_path(&self, ref_name: &str) -> crate::Result<PathBuf> {
         let re = Regex::new(INVALID_BRANCH_NAME_PATTERN).unwrap();
         if re.is_match(ref_name) {
-            let message = format!("fatal: '{}' is not a valid branch name", ref_name);
-            return Err(Error::new(ErrorKind::Other, message));
+            let message = format!("'{}' is not a valid branch name", ref_name);
+            return Err(crate::Error::Fatal(None, message));
         }
         Ok(self.repository.git_dir().join("refs/heads/").join(ref_name))
     }

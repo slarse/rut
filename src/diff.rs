@@ -24,7 +24,7 @@ pub fn diff_repository(
     repository: &Repository,
     options: &Options,
     writer: &mut dyn OutputWriter,
-) -> io::Result<()> {
+) -> crate::Result<()> {
     if options.cached {
         diff_repository_cached(repository, writer)
     } else {
@@ -35,7 +35,7 @@ pub fn diff_repository(
 fn diff_repository_cached(
     repository: &Repository,
     writer: &mut dyn OutputWriter,
-) -> io::Result<()> {
+) -> crate::Result<()> {
     let mut index = repository.load_index()?;
     let path_to_committed_id = status::resolve_committed_paths_and_ids(repository)?;
     let files_with_staged_changes = status::resolve_files_with_staged_changes(
@@ -65,7 +65,7 @@ fn diff_repository_cached(
 fn diff_repository_default(
     repository: &Repository,
     writer: &mut dyn OutputWriter,
-) -> io::Result<()> {
+) -> crate::Result<()> {
     let mut index = repository.load_index()?;
     let path_to_committed_id = status::resolve_committed_paths_and_ids(repository)?;
 
@@ -87,7 +87,7 @@ fn diff_unstaged_change(
     change: &status::Change,
     repository: &Repository,
     writer: &mut dyn OutputWriter,
-) -> io::Result<()> {
+) -> crate::Result<()> {
     let a_index_entry = index.get(&change.path).unwrap();
     let (a_lines, a_oid) = read_blob_from_index_entry(a_index_entry, repository)?;
     let a_lines_ref = a_lines.iter().map(|s| s.as_str()).collect::<Vec<&str>>();
@@ -110,7 +110,7 @@ fn diff_unstaged_change(
 fn read_blob_from_index_entry(
     index_entry: &IndexEntry,
     repository: &Repository,
-) -> io::Result<(Vec<String>, Option<String>)> {
+) -> crate::Result<(Vec<String>, Option<String>)> {
     let blob = repository.database.load_blob(&index_entry.object_id)?;
     let content = String::from_utf8(blob.content().to_vec()).ok().unwrap();
     let lines: Vec<String> = content.split('\n').map(|s| s.to_owned()).collect();
@@ -121,7 +121,7 @@ fn read_blob_from_index_entry(
 fn read_blob_from_worktree(
     change: &status::Change,
     repository: &Repository,
-) -> io::Result<(Vec<String>, Option<String>)> {
+) -> crate::Result<(Vec<String>, Option<String>)> {
     let (b_lines, b_oid) = match change.change_type {
         status::ChangeType::Deleted => (vec![], None),
         _ => {
@@ -141,7 +141,7 @@ fn diff_blobs(
     staged_blob: Option<&Blob>,
     relative_path: &Path,
     writer: &mut dyn OutputWriter,
-) -> io::Result<()> {
+) -> crate::Result<()> {
     let empty_string = || "".to_string();
     let committed_content = committed_blob
         .and_then(|blob| String::from_utf8(blob.content().to_vec()).ok())
@@ -175,7 +175,7 @@ fn diff_content(
     b_lines: &[&str],
     b_oid: Option<String>,
     writer: &mut dyn OutputWriter,
-) -> io::Result<()> {
+) -> crate::Result<()> {
     let edit_script = edit_script(a_lines, b_lines);
     let chunks = chunk_edit_script(&edit_script, MAX_DIFF_CONTEXT_LINES);
 

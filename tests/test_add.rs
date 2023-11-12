@@ -3,7 +3,7 @@ use std::{fs, io, path::PathBuf};
 use rut::index::Index;
 
 #[test]
-fn test_add_directory() -> io::Result<()> {
+fn test_add_directory() -> rut::Result<()> {
     // arrange
     let repository = rut_testhelpers::create_repository();
     let workdir = repository.worktree().root();
@@ -41,7 +41,7 @@ fn test_add_directory() -> io::Result<()> {
 }
 
 #[test]
-fn test_adding_file_when_index_is_locked() -> io::Result<()> {
+fn test_adding_file_when_index_is_locked() -> rut::Result<()> {
     // arrange
     let repository = rut_testhelpers::create_repository();
 
@@ -72,7 +72,7 @@ fn test_adding_file_when_index_is_locked() -> io::Result<()> {
 }
 
 #[test]
-fn test_add_removed_file() -> io::Result<()> {
+fn test_add_removed_file() -> rut::Result<()> {
     // arrange
     let repository = rut_testhelpers::create_repository();
 
@@ -98,7 +98,7 @@ fn test_add_removed_file() -> io::Result<()> {
 }
 
 #[test]
-fn test_add_nonexisting_file() -> io::Result<()> {
+fn test_add_nonexisting_file() -> rut::Result<()> {
     // arrange
     let repository = rut_testhelpers::create_repository();
 

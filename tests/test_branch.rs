@@ -1,9 +1,7 @@
-use std::io;
-
 use rut_testhelpers::assert_file_contains;
 
 #[test]
-fn test_create_valid_branch() -> io::Result<()> {
+fn test_create_valid_branch() -> rut::Result<()> {
     // arrange
     let repository = rut_testhelpers::create_repository();
     let commit_oid = rut_testhelpers::rut_commit("Initial commit", &repository)?;
@@ -21,7 +19,7 @@ fn test_create_valid_branch() -> io::Result<()> {
 }
 
 #[test]
-fn test_error_on_creating_duplicate_branch() -> io::Result<()> {
+fn test_error_on_creating_duplicate_branch() -> rut::Result<()> {
     // arrrange
     let repository = rut_testhelpers::create_repository();
     rut_testhelpers::rut_commit("Initial commit", &repository)?;
@@ -44,7 +42,7 @@ fn test_error_on_creating_duplicate_branch() -> io::Result<()> {
 }
 
 #[test]
-fn test_error_on_invalid_branch_name() -> io::Result<()> {
+fn test_error_on_invalid_branch_name() -> rut::Result<()> {
     // arrange
     let repository = rut_testhelpers::create_repository();
     rut_testhelpers::rut_commit("Initial commit", &repository)?;
@@ -65,7 +63,7 @@ fn test_error_on_invalid_branch_name() -> io::Result<()> {
 }
 
 #[test]
-fn test_branch_off_non_head_commit() -> io::Result<()> {
+fn test_branch_off_non_head_commit() -> rut::Result<()> {
     // arrange
     let repository = rut_testhelpers::create_repository();
     let initial_commit_oid = rut_testhelpers::rut_commit("Initial commit", &repository)?;

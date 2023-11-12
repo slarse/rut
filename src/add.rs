@@ -9,7 +9,7 @@ use crate::{
 
 pub static GITIGNORE: [&str; 2] = ["Cargo.lock", "target"];
 
-pub fn add<P: AsRef<Path>>(path: P, repository: &Repository) -> io::Result<()> {
+pub fn add<P: AsRef<Path>>(path: P, repository: &Repository) -> crate::Result<()> {
     if GITIGNORE.contains(&path.as_ref().to_str().expect("Path was bad UTF8")) {
         return Ok(());
     }
@@ -26,19 +26,16 @@ pub fn add<P: AsRef<Path>>(path: P, repository: &Repository) -> io::Result<()> {
         match index.as_mut().remove(&relative_path) {
             Some(_) => (),
             None => {
-                let message = format!(
-                    "fatal: pathspec {:?} did not match any files",
-                    path.as_ref()
-                );
-                return Err(io::Error::new(io::ErrorKind::NotFound, message));
+                let message = format!("pathspec {:?} did not match any files", path.as_ref());
+                return Err(crate::Error::Fatal(None, message));
             }
         }
     }
 
-    index.write()
+    Ok(index.write()?)
 }
 
-fn add_file(absolute_path: &Path, index: &mut Index, repository: &Repository) -> io::Result<()> {
+fn add_file(absolute_path: &Path, index: &mut Index, repository: &Repository) -> crate::Result<()> {
     let file_bytes = file::read_file(absolute_path)?;
     let blob = Blob::new(file_bytes);
     repository.database.store_object(&blob)?;

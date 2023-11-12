@@ -54,7 +54,7 @@ pub struct LockFile {
 }
 
 impl LockFile {
-    pub fn acquire(path: &PathBuf) -> io::Result<LockFile> {
+    pub fn acquire(path: &PathBuf) -> crate::Result<LockFile> {
         let base_extension = String::from("lock");
         let lockfile_extension = match path.extension() {
             Some(ext) => format!("{:?}.{}", ext, base_extension),
@@ -85,17 +85,16 @@ impl LockFile {
     fn handle_lockfile_create_failure(
         result: Result<File, io::Error>,
         lockfile_path: &Path,
-    ) -> std::io::Result<File> {
+    ) -> crate::Result<File> {
         match result {
-            ok @ Ok(_) => ok,
             Err(error) if error.kind() == io::ErrorKind::AlreadyExists => {
                 let message = format!(
-                    "fatal: Unable to create '{}': File exists.",
+                    "Unable to create '{}': File exists.",
                     lockfile_path.to_str().unwrap()
                 );
-                Err(io::Error::new(io::ErrorKind::AlreadyExists, message))
+                Err(crate::Error::Fatal(Some(Box::new(error)), message))
             }
-            err => err,
+            other => Ok(other?),
         }
     }
 }

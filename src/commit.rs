@@ -19,7 +19,7 @@ pub fn commit(
     repository: &Repository,
     options: &Options,
     writer: &mut dyn OutputWriter,
-) -> io::Result<()> {
+) -> crate::Result<()> {
     if let Some(message) = &options.message {
         fs::write(repository.git_dir().join("COMMIT_EDITMSG"), message)?;
     }
@@ -41,7 +41,7 @@ pub fn create_commit<'a>(
     repository: &'a Repository,
     index: &'a mut Index,
     head_ref: &'a str,
-) -> io::Result<Commit> {
+) -> crate::Result<Commit> {
     let (root_tree, containing_trees) = build_tree(&index.get_entries()[..]);
     for tree in containing_trees.iter() {
         repository.database.store_object(tree)?;

@@ -3,7 +3,7 @@ use std::{fs, io};
 use rut::status;
 
 #[test]
-fn test_status_shows_untracked_file() -> io::Result<()> {
+fn test_status_shows_untracked_file() -> rut::Result<()> {
     // arrange
     let repository = rut_testhelpers::create_repository();
 
@@ -20,7 +20,7 @@ fn test_status_shows_untracked_file() -> io::Result<()> {
 }
 
 #[test]
-fn test_status_does_not_show_unmodified_tracked_file() -> io::Result<()> {
+fn test_status_does_not_show_unmodified_tracked_file() -> rut::Result<()> {
     // arrange
     let repository = rut_testhelpers::create_repository();
 
@@ -39,7 +39,7 @@ fn test_status_does_not_show_unmodified_tracked_file() -> io::Result<()> {
 }
 
 #[test]
-fn test_status_does_not_show_unmodified_tracked_file_with_modified_mtime() -> io::Result<()> {
+fn test_status_does_not_show_unmodified_tracked_file_with_modified_mtime() -> rut::Result<()> {
     // arrange
     let repository = rut_testhelpers::create_repository();
 
@@ -68,7 +68,7 @@ fn test_status_does_not_show_unmodified_tracked_file_with_modified_mtime() -> io
 }
 
 #[test]
-fn test_status_shows_entire_directory_as_untracked() -> io::Result<()> {
+fn test_status_shows_entire_directory_as_untracked() -> rut::Result<()> {
     // arrange
     let repository = rut_testhelpers::create_repository();
 
@@ -87,7 +87,7 @@ fn test_status_shows_entire_directory_as_untracked() -> io::Result<()> {
 }
 
 #[test]
-fn test_output_path_sorting() -> io::Result<()> {
+fn test_output_path_sorting() -> rut::Result<()> {
     // arrange
     let repository = rut_testhelpers::create_repository();
     let workdir = repository.worktree().root();
@@ -109,7 +109,7 @@ fn test_output_path_sorting() -> io::Result<()> {
 }
 
 #[test]
-fn test_shows_modified_file() -> io::Result<()> {
+fn test_shows_modified_file() -> rut::Result<()> {
     // arrange
     let repository = rut_testhelpers::create_repository();
 
@@ -129,7 +129,7 @@ fn test_shows_modified_file() -> io::Result<()> {
 }
 
 #[test]
-fn test_shows_modified_staged_file_in_subdirectory() -> io::Result<()> {
+fn test_shows_modified_staged_file_in_subdirectory() -> rut::Result<()> {
     // arrange
     let repository = rut_testhelpers::create_repository();
 
@@ -152,7 +152,7 @@ fn test_shows_modified_staged_file_in_subdirectory() -> io::Result<()> {
 }
 
 #[test]
-fn test_shows_newly_created_file_in_subdirectory() -> io::Result<()> {
+fn test_shows_newly_created_file_in_subdirectory() -> rut::Result<()> {
     // arrange
     let repository = rut_testhelpers::create_repository();
 
@@ -172,7 +172,7 @@ fn test_shows_newly_created_file_in_subdirectory() -> io::Result<()> {
 }
 
 #[test]
-fn test_shows_deleted_unstaged_file() -> io::Result<()> {
+fn test_shows_deleted_unstaged_file() -> rut::Result<()> {
     // arrange
     let repository = rut_testhelpers::create_repository();
 
@@ -192,7 +192,7 @@ fn test_shows_deleted_unstaged_file() -> io::Result<()> {
 }
 
 #[test]
-fn test_shows_deleted_staged_file() -> io::Result<()> {
+fn test_shows_deleted_staged_file() -> rut::Result<()> {
     // arrange
     let repository = rut_testhelpers::create_repository();
 
@@ -212,7 +212,7 @@ fn test_shows_deleted_staged_file() -> io::Result<()> {
 }
 
 #[test]
-fn test_human_readable_format() -> io::Result<()> {
+fn test_human_readable_format() -> rut::Result<()> {
     // arrange
     let repository = rut_testhelpers::create_repository();
     let workdir = repository.worktree().root();
@@ -245,7 +245,7 @@ fn test_human_readable_format() -> io::Result<()> {
 }
 
 #[test]
-fn test_status_shows_untracked_file_in_tracked_directory() -> io::Result<()> {
+fn test_status_shows_untracked_file_in_tracked_directory() -> rut::Result<()> {
     // arrange
     let repository = rut_testhelpers::create_repository();
     let workdir = repository.worktree().root();

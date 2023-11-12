@@ -63,7 +63,7 @@ pub fn run_command<P: AsRef<Path>, S: Into<OsString> + Clone>(
     args: Vec<S>,
     workdir: P,
     writer: &mut dyn OutputWriter,
-) -> io::Result<()> {
+) -> crate::Result<()> {
     let git_dir = workdir.as_ref().join(".git");
 
     let repository = Repository::from_worktree_root(workdir);

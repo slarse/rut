@@ -1,7 +1,7 @@
 use std::io;
 
 #[test]
-fn test_parse_head() -> io::Result<()> {
+fn test_parse_head() -> rut::Result<()> {
     // arrange
     let repository = rut_testhelpers::create_repository();
     let commit_oid = rut_testhelpers::rut_commit("Initial commit", &repository)?;
@@ -16,7 +16,7 @@ fn test_parse_head() -> io::Result<()> {
 }
 
 #[test]
-fn test_parse_head_parent() -> io::Result<()> {
+fn test_parse_head_parent() -> rut::Result<()> {
     // arrange
     let repository = rut_testhelpers::create_repository();
     let parent_oid = rut_testhelpers::rut_commit("Initial commit", &repository)?;
@@ -32,7 +32,7 @@ fn test_parse_head_parent() -> io::Result<()> {
 }
 
 #[test]
-fn test_parse_head_ancestor() -> io::Result<()> {
+fn test_parse_head_ancestor() -> rut::Result<()> {
     // arrange
     let repository = rut_testhelpers::create_repository();
     let commit_oid = rut_testhelpers::rut_commit("Initial commit", &repository)?;
@@ -49,7 +49,7 @@ fn test_parse_head_ancestor() -> io::Result<()> {
 }
 
 #[test]
-fn test_parse_branch() -> io::Result<()> {
+fn test_parse_branch() -> rut::Result<()> {
     // arrange
     let repository = rut_testhelpers::create_repository();
     let initial_commit_oid = rut_testhelpers::rut_commit("Initial commit", &repository)?;

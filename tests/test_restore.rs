@@ -1,7 +1,7 @@
 use std::{fs, io};
 
 #[test]
-fn test_restores_unstaged_file_to_last_commit() -> io::Result<()> {
+fn test_restores_unstaged_file_to_last_commit() -> rut::Result<()> {
     // arrange
     let repository = rut_testhelpers::create_repository();
 
@@ -20,7 +20,7 @@ fn test_restores_unstaged_file_to_last_commit() -> io::Result<()> {
 }
 
 #[test]
-fn test_restores_file_to_specified_commit() -> io::Result<()> {
+fn test_restores_file_to_specified_commit() -> rut::Result<()> {
     // arrange
     let repository = rut_testhelpers::create_repository();
 

@@ -6,7 +6,7 @@ use rut::{
 };
 
 #[test]
-fn test_diff_shows_modified_unstaged_files() -> io::Result<()> {
+fn test_diff_shows_modified_unstaged_files() -> rut::Result<()> {
     // arrange
     let repository = rut_testhelpers::create_repository();
     let file = repository.worktree().root().join("file.txt");
@@ -40,7 +40,7 @@ fn test_diff_shows_modified_unstaged_files() -> io::Result<()> {
 }
 
 #[test]
-fn test_diff_shows_context_lines() -> io::Result<()> {
+fn test_diff_shows_context_lines() -> rut::Result<()> {
     // arrange
     let repository = rut_testhelpers::create_repository();
 
@@ -74,7 +74,7 @@ fn test_diff_shows_context_lines() -> io::Result<()> {
 }
 
 #[test]
-fn test_diff_omits_final_empty_line() -> io::Result<()> {
+fn test_diff_omits_final_empty_line() -> rut::Result<()> {
     // arrange
     let repository = rut_testhelpers::create_repository();
 
@@ -107,7 +107,7 @@ fn test_diff_omits_final_empty_line() -> io::Result<()> {
 }
 
 #[test]
-fn test_diff_cached_shows_staged_changes() -> io::Result<()> {
+fn test_diff_cached_shows_staged_changes() -> rut::Result<()> {
     // arrange
     let repository = rut_testhelpers::create_repository();
 
@@ -124,7 +124,7 @@ fn test_diff_cached_shows_staged_changes() -> io::Result<()> {
 }
 
 #[test]
-fn test_diff_cached_shows_staged_changes_in_subdirectory() -> io::Result<()> {
+fn test_diff_cached_shows_staged_changes_in_subdirectory() -> rut::Result<()> {
     // arrange
     let repository = rut_testhelpers::create_repository();
 
@@ -143,7 +143,7 @@ fn test_diff_cached_shows_staged_changes_in_subdirectory() -> io::Result<()> {
 }
 
 #[test]
-fn test_diff_cached_shows_staged_changes_of_new_file() -> io::Result<()> {
+fn test_diff_cached_shows_staged_changes_of_new_file() -> rut::Result<()> {
     // arrange
     let repository = rut_testhelpers::create_repository();
     rut_testhelpers::rut_commit("First commit", &repository)?;
@@ -169,7 +169,7 @@ index 0000000..9649cde
 }
 
 #[test]
-fn test_diff_deleted_file() -> io::Result<()> {
+fn test_diff_deleted_file() -> rut::Result<()> {
     // arrange
     let repository = rut_testhelpers::create_repository();
     let file = repository.worktree().root().join("file.txt");
@@ -197,7 +197,7 @@ index 9649cde..0000000
 fn create_committed_file_with_staged_changes(
     repository: &Repository,
     file: &Path,
-) -> io::Result<String> {
+) -> rut::Result<String> {
     let initial_content = "1\n";
     fs::write(file, initial_content)?;
     rut_testhelpers::rut_add(file, repository);

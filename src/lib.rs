@@ -42,3 +42,7 @@ pub mod branch;
 mod object_resolver;
 
 pub mod revparse;
+
+pub mod error;
+
+pub use crate::error::{Result, Error};

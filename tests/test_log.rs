@@ -6,7 +6,7 @@ use rut::objects::GitObject;
 use rut::objects::ObjectId;
 
 #[test]
-fn test_log() -> io::Result<()> {
+fn test_log() -> rut::Result<()> {
     // arrange
     let repository = rut_testhelpers::create_repository();
 
@@ -36,7 +36,7 @@ Date:   {}
 }
 
 #[test]
-fn test_log_two_commits() -> io::Result<()> {
+fn test_log_two_commits() -> rut::Result<()> {
     // arrange
     let repository = rut_testhelpers::create_repository();
 
@@ -57,7 +57,7 @@ fn test_log_two_commits() -> io::Result<()> {
 }
 
 #[test]
-fn test_log_two_commits_with_max_count_1() -> io::Result<()> {
+fn test_log_two_commits_with_max_count_1() -> rut::Result<()> {
     // arrange
     let repository = rut_testhelpers::create_repository();
 
@@ -77,7 +77,7 @@ fn test_log_two_commits_with_max_count_1() -> io::Result<()> {
 }
 
 #[test]
-fn test_log_two_commits_with_oneline_formatting() -> io::Result<()> {
+fn test_log_two_commits_with_oneline_formatting() -> rut::Result<()> {
     // arrange
     let repository = rut_testhelpers::create_repository();
 

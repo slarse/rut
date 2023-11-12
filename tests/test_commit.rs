@@ -3,7 +3,7 @@ use std::{fs, io};
 use rut::workspace::Repository;
 
 #[test]
-fn test_first_commit_denoted_as_root_commit_in_status_message() -> io::Result<()> {
+fn test_first_commit_denoted_as_root_commit_in_status_message() -> rut::Result<()> {
     // arrange
     let repository = rut_testhelpers::create_repository();
 
@@ -20,7 +20,7 @@ fn test_first_commit_denoted_as_root_commit_in_status_message() -> io::Result<()
 }
 
 #[test]
-fn test_creating_commit_with_nested_directory() -> io::Result<()> {
+fn test_creating_commit_with_nested_directory() -> rut::Result<()> {
     // arrange
     let repository = rut_testhelpers::create_repository();
     let workdir = repository.worktree().root();
@@ -53,7 +53,7 @@ fn test_creating_commit_with_nested_directory() -> io::Result<()> {
 }
 
 #[test]
-fn test_second_commit_gets_proper_parent() -> io::Result<()> {
+fn test_second_commit_gets_proper_parent() -> rut::Result<()> {
     // arrange
     let repository = rut_testhelpers::create_repository();
 

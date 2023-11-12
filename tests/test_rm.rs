@@ -3,7 +3,7 @@ use std::{fs, io, path::PathBuf};
 use rut::index::Index;
 
 #[test]
-fn test_remove_file() -> io::Result<()> {
+fn test_remove_file() -> rut::Result<()> {
     // arrange
     let repository = rut_testhelpers::create_repository();
     let workdir = repository.worktree().root();

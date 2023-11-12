@@ -444,7 +444,7 @@ impl Repository {
         self.git_dir().join("index")
     }
 
-    pub fn load_index(&self) -> io::Result<LockFileResource<Index>> {
+    pub fn load_index(&self) -> crate::Result<LockFileResource<Index>> {
         let index_file_path = self.git_dir().join("index");
         let lockfile = LockFile::acquire(&index_file_path)?;
         let index = Index::from_file(&index_file_path)?;

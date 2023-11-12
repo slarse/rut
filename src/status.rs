@@ -28,7 +28,7 @@ pub fn status(
     repository: &Repository,
     options: &Options,
     writer: &mut dyn OutputWriter,
-) -> io::Result<()> {
+) -> crate::Result<()> {
     let worktree = repository.worktree();
     let mut index_lockfile = repository.load_index()?;
     let index = index_lockfile.as_mut();
@@ -59,14 +59,14 @@ pub fn status(
         }
     }
 
-    index_lockfile.write()
+    Ok(index_lockfile.write()?)
 }
 
 pub fn resolve_files_with_staged_changes(
     path_to_committed_id: &HashMap<PathBuf, ObjectId>,
     repository: &Repository,
     index: &Index,
-) -> io::Result<Vec<PathBuf>> {
+) -> crate::Result<Vec<PathBuf>> {
     let staged_changes = resolve_staged_modifications(path_to_committed_id, repository, index)?;
     let worktree_root = repository.worktree().root();
     let paths_with_staged_changes = staged_changes
@@ -79,7 +79,7 @@ pub fn resolve_files_with_unstaged_changes(
     path_to_committed_id: &HashMap<PathBuf, ObjectId>,
     repository: &Repository,
     index: &mut Index,
-) -> io::Result<Vec<PathBuf>> {
+) -> crate::Result<Vec<PathBuf>> {
     let worktree = repository.worktree();
     let tracked_paths = resolve_tracked_paths(path_to_committed_id, worktree, index);
 
@@ -325,7 +325,7 @@ fn resolve_staged_changes(
     path_to_committed_id: &HashMap<PathBuf, ObjectId>,
     repository: &Repository,
     index: &mut Index,
-) -> io::Result<Vec<Change>> {
+) -> crate::Result<Vec<Change>> {
     let mut staged_changes = resolve_staged_modifications(path_to_committed_id, repository, index)?;
     staged_changes.extend(resolve_staged_deletions(
         path_to_committed_id,
@@ -339,7 +339,7 @@ fn resolve_staged_modifications(
     path_to_committed_id: &HashMap<PathBuf, ObjectId>,
     repository: &Repository,
     index: &Index,
-) -> io::Result<Vec<Change>> {
+) -> crate::Result<Vec<Change>> {
     let staged_paths_filter = |entry: &DirEntry| {
         if entry.path().is_dir() {
             return true;
@@ -363,7 +363,7 @@ fn classify_staged_changes(
     path_to_committed_id: &HashMap<PathBuf, ObjectId>,
     repository: &Repository,
     index: &Index,
-) -> io::Result<Vec<Change>> {
+) -> crate::Result<Vec<Change>> {
     let mut changes = vec![];
 
     for path in staged_paths {
@@ -424,7 +424,7 @@ fn resolve_unstaged_deletions<'a>(
 
 pub fn resolve_committed_paths_and_ids(
     repository: &Repository,
-) -> io::Result<HashMap<PathBuf, ObjectId>> {
+) -> crate::Result<HashMap<PathBuf, ObjectId>> {
     let head_commit_id_opt = RefHandler::new(repository).head();
     if head_commit_id_opt.is_err() {
         return Ok(HashMap::new());
@@ -483,7 +483,7 @@ fn resolve_unstaged_modifications<'a>(
 ///
 /// Side effect: Updates the index with new mtimes if they've been updatet without the content being
 /// changed.
-fn is_modified(absolute_path: &Path, tracked_path: &Path, index: &mut Index) -> io::Result<bool> {
+fn is_modified(absolute_path: &Path, tracked_path: &Path, index: &mut Index) -> crate::Result<bool> {
     let is_modified = if let Some(index_entry) = index.get_mut(tracked_path) {
         let metadata = fs::metadata(absolute_path)?;
         let mtimes_differ = index_entry.mtime_seconds != metadata.st_mtime() as u32
@@ -508,7 +508,7 @@ fn is_modified(absolute_path: &Path, tracked_path: &Path, index: &mut Index) -> 
     Ok(is_modified)
 }
 
-fn hash_as_blob(absolute_path: &Path) -> io::Result<ObjectId> {
+fn hash_as_blob(absolute_path: &Path) -> crate::Result<ObjectId> {
     let content = file::read_file(absolute_path)?;
     let blob = Blob::new(content);
     Ok(blob.id().clone())
