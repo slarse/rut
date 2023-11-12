@@ -1,6 +1,5 @@
 use std::{
     collections::HashMap,
-    io,
     path::{Path, PathBuf},
 };
 
@@ -27,11 +26,11 @@ impl<'a> ObjectResolver<'a> {
         }
     }
 
-    pub fn from_head_commit(repository: &'a Repository) -> io::Result<Self> {
+    pub fn from_head_commit(repository: &'a Repository) -> crate::Result<Self> {
         ObjectResolver::from_reference("HEAD", repository)
     }
 
-    pub fn from_reference(reference: &str, repository: &'a Repository) -> io::Result<Self> {
+    pub fn from_reference(reference: &str, repository: &'a Repository) -> crate::Result<Self> {
         let commit_id = RefHandler::new(repository).deref(reference)?;
         let commit = repository.database.load_commit(&commit_id)?;
         let root_tree = repository.database.load_tree(&commit.tree)?;
@@ -40,7 +39,7 @@ impl<'a> ObjectResolver<'a> {
     }
 
     /// Find a blob by its path, relative to the root tree of this ObjectResolver.
-    pub fn find_blob_by_path(&mut self, path: &Path) -> io::Result<Blob> {
+    pub fn find_blob_by_path(&mut self, path: &Path) -> crate::Result<Blob> {
         if let Some(blob) = self.blobs.get(path) {
             return Ok(blob.clone());
         }
@@ -63,7 +62,7 @@ impl<'a> ObjectResolver<'a> {
         &mut self,
         parent_path: &Path,
         remaining_path: &Path,
-    ) -> io::Result<Blob> {
+    ) -> crate::Result<Blob> {
         if remaining_path.components().count() <= 1 {
             return self.get_blob(&parent_path.join(remaining_path));
         }
@@ -76,7 +75,7 @@ impl<'a> ObjectResolver<'a> {
         &mut self,
         parent_path: &Path,
         remaining_path: &Path,
-    ) -> io::Result<Blob> {
+    ) -> crate::Result<Blob> {
         let mut path_components = remaining_path.iter().map(|p| p.to_str().unwrap());
         let root_component = path_components.next().unwrap();
         let current_path = parent_path.join(root_component);
@@ -101,7 +100,7 @@ impl<'a> ObjectResolver<'a> {
     }
 
     /// Get a blob assuming its parent tree is already cached.
-    fn get_blob(&mut self, blob_path: &Path) -> io::Result<Blob> {
+    fn get_blob(&mut self, blob_path: &Path) -> crate::Result<Blob> {
         let file_name = blob_path.file_name().unwrap().to_str().unwrap();
         let tree = &self.trees[blob_path.parent().unwrap()];
 
@@ -114,9 +113,9 @@ impl<'a> ObjectResolver<'a> {
             }
         }
 
-        Err(io::Error::new(
-            io::ErrorKind::NotFound,
-            format!("Could not find file {} in tree", blob_path.display()),
+        Err(crate::Error::Fatal(
+            None,
+            format!("pathspec '{}' did not match any files", blob_path.display()),
         ))
     }
 }

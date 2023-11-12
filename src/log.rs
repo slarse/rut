@@ -27,7 +27,7 @@ pub fn log(
     repository: &Repository,
     options: &Options,
     writer: &mut dyn OutputWriter,
-) -> io::Result<()> {
+) -> crate::Result<()> {
     let refs = RefHandler::new(repository);
     let head_commit = repository.database.load_commit(&refs.head()?)?;
 

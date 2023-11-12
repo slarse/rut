@@ -186,7 +186,7 @@ pub fn rut_restore(
     file: &Path,
     options: &restore::Options,
     repository: &Repository,
-) -> io::Result<()> {
+) -> rut::Result<()> {
     restore::restore_worktree(file, options, repository)?;
     Ok(())
 }
@@ -251,12 +251,12 @@ pub fn commit_content(
     rut_commit(commit_message, repository)
 }
 
-pub fn rut_log_default(repository: &Repository) -> io::Result<String> {
+pub fn rut_log_default(repository: &Repository) -> rut::Result<String> {
     let options = log::OptionsBuilder::default().build().ok().unwrap();
     rut_log(repository, &options)
 }
 
-pub fn rut_log(repository: &Repository, options: &log::Options) -> io::Result<String> {
+pub fn rut_log(repository: &Repository, options: &log::Options) -> rut::Result<String> {
     let mut output_writer = CapturingOutputWriter {
         output: String::new(),
     };

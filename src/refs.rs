@@ -1,8 +1,6 @@
 use std::fmt;
 use std::fs;
 use std::io;
-use std::io::Error;
-use std::io::ErrorKind;
 use std::path::PathBuf;
 use std::str;
 use std::str::FromStr;
@@ -32,7 +30,7 @@ impl<'a> RefHandler<'a> {
     }
 
     /// Dereference a reference to an object id.
-    pub fn deref(&self, reference: &str) -> io::Result<ObjectId> {
+    pub fn deref(&self, reference: &str) -> crate::Result<ObjectId> {
         if reference == "HEAD" {
             return self.head();
         }
@@ -50,10 +48,10 @@ impl<'a> RefHandler<'a> {
             fs::read_to_string(&ref_file).map(|content| content.trim().to_owned())?
         } else {
             let message = format!("Could not dereference ref {}", reference);
-            return Err(Error::new(io::ErrorKind::Other, message));
+            return Err(crate::Error::Fatal(None, message));
         };
 
-        ObjectId::from_sha(&result).map_err(|err| Error::new(io::ErrorKind::Other, err.to_string()))
+        ObjectId::from_sha(&result).map_err(|err| crate::Error::Fatal(None, err))
     }
 
     pub fn write_ref(&self, ref_name: &str, object_id: &ObjectId) -> crate::Result<()> {
@@ -68,7 +66,7 @@ impl<'a> RefHandler<'a> {
         let result = file::create_file(&ref_path, hex_string.as_bytes());
 
         match result {
-            Err(error) if error.kind() == ErrorKind::AlreadyExists => {
+            Err(error) if error.kind() == io::ErrorKind::AlreadyExists => {
                 let message = format!("a branch named '{}' already exists", ref_name);
                 return Err(crate::Error::Fatal(Some(Box::new(error)), message));
             }
@@ -86,7 +84,7 @@ impl<'a> RefHandler<'a> {
     }
 
     /// Convenience method to get the object id of the current HEAD.
-    pub fn head(&self) -> io::Result<ObjectId> {
+    pub fn head(&self) -> crate::Result<ObjectId> {
         let head = self.repository.head()?;
         self.deref(&head)
     }
@@ -173,16 +171,13 @@ impl Revision {
         }
     }
 
-    pub fn resolve(&self, repository: &Repository) -> io::Result<ObjectId> {
+    pub fn resolve(&self, repository: &Repository) -> crate::Result<ObjectId> {
         let refs = RefHandler::new(repository);
 
         let err = |revision: &Revision| {
-            Error::new(
-                ErrorKind::Other,
-                format!(
-                    "fatal: ambiguous argument '{:?}': unknown revision",
-                    revision
-                ),
+            crate::Error::Fatal(
+                None,
+                format!("ambiguous argument '{:?}': unknown revision", revision),
             )
         };
 
