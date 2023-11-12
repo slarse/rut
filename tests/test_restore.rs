@@ -1,4 +1,4 @@
-use std::{fs, io};
+use std::fs;
 
 #[test]
 fn test_restores_unstaged_file_to_last_commit() -> rut::Result<()> {

@@ -1,4 +1,4 @@
-use std::{fs, io, path::Path, thread};
+use std::{fs, path::Path, thread};
 
 use rut::{
     objects::{Blob, GitObject},

@@ -1,5 +1,3 @@
-use std::io;
-
 use rut::log;
 
 use rut::objects::GitObject;

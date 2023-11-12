@@ -45,4 +45,4 @@ pub mod revparse;
 
 pub mod error;
 
-pub use crate::error::{Result, Error};
+pub use crate::error::{Error, Result};

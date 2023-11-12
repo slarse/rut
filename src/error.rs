@@ -1,6 +1,6 @@
 use crate::refs::ParseRevisionError;
 
-use std::{error, result, fmt, io};
+use std::{error, fmt, io, result};
 
 #[derive(Debug)]
 pub enum Error {

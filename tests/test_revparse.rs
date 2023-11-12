@@ -1,5 +1,3 @@
-use std::io;
-
 #[test]
 fn test_parse_head() -> rut::Result<()> {
     // arrange

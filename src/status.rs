@@ -483,7 +483,11 @@ fn resolve_unstaged_modifications<'a>(
 ///
 /// Side effect: Updates the index with new mtimes if they've been updatet without the content being
 /// changed.
-fn is_modified(absolute_path: &Path, tracked_path: &Path, index: &mut Index) -> crate::Result<bool> {
+fn is_modified(
+    absolute_path: &Path,
+    tracked_path: &Path,
+    index: &mut Index,
+) -> crate::Result<bool> {
     let is_modified = if let Some(index_entry) = index.get_mut(tracked_path) {
         let metadata = fs::metadata(absolute_path)?;
         let mtimes_differ = index_entry.mtime_seconds != metadata.st_mtime() as u32
