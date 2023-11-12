@@ -3,9 +3,9 @@ use std::fmt::Debug;
 use std::io::{Error, Write};
 use std::os::unix::io::AsRawFd;
 
-use crate::{branch, revparse};
 use crate::output::{Color, OutputWriter, Style};
 use crate::{add, commit, diff, init, log, restore, rm, status, workspace::Repository};
+use crate::{branch, revparse};
 use std::io;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
@@ -52,6 +52,7 @@ enum Action {
     },
     Branch {
         name: Option<String>,
+        start_point: Option<String>,
     },
     RevParse {
         revision: String,
@@ -124,9 +125,10 @@ pub fn run_command<P: AsRef<Path>, S: Into<OsString> + Clone>(
                 .unwrap();
             log::log(&repository, &options, writer)?;
         }
-        Action::Branch { name } => {
+        Action::Branch { name, start_point } => {
             let options = branch::OptionsBuilder::default()
                 .name(name)
+                .start_point(start_point)
                 .build()
                 .unwrap();
             branch::branch(&options, &repository)?;

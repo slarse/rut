@@ -1,5 +1,7 @@
 use std::io;
 
+use rut_testhelpers::assert_file_contains;
+
 #[test]
 fn test_create_valid_branch() -> io::Result<()> {
     // arrange
@@ -58,6 +60,25 @@ fn test_error_on_invalid_branch_name() -> io::Result<()> {
             assert_eq!(message, expected_message);
         }
     }
+
+    Ok(())
+}
+
+#[test]
+fn test_branch_off_non_head_commit() -> io::Result<()> {
+    // arrange
+    let repository = rut_testhelpers::create_repository();
+    let initial_commit_oid = rut_testhelpers::rut_commit("Initial commit", &repository)?;
+    rut_testhelpers::rut_commit("Second commit", &repository)?;
+
+    // act
+    rut_testhelpers::run_command_string("branch new-branch HEAD^", &repository)?;
+
+    // assert
+    assert_file_contains(
+        &repository.git_dir().join("refs/heads/new-branch"),
+        &initial_commit_oid,
+    );
 
     Ok(())
 }

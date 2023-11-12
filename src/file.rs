@@ -42,7 +42,7 @@ pub fn create_file(path: &Path, content: &[u8]) -> io::Result<()> {
 /// Struct that enables synchronized atomic writing to files. On acquiring with a lock with
 /// [`LockFile::acquire`] an empty lockfile is created in the file system. You can then use
 /// [`LockFile::write`] to write content to the lockfile.
-/// 
+///
 /// When the [`LockFile`] goes out of scope, the lockfile itself is renamed to the target file for
 /// which the lock was acquired. Renames are atomic operations, so there is no risk that someone
 /// reading the file without acquiring the lock gets a partially written result.
@@ -191,7 +191,7 @@ pub trait AsVec<T> {
 
 /// A resource backed by a lockfile. The final write is atomically transferred to the original file
 /// when this struct is destroyed.
-/// 
+///
 /// Do note that any intermediate writes are simply discarded.
 pub struct LockFileResource<T: AsVec<u8>> {
     lockfile: LockFile,

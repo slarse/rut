@@ -36,11 +36,11 @@ pub struct ObjectId {
 
 impl ObjectId {
     /// Turn a hexadecimal string into an ObjectId. This is the inverse of to_string().
-    /// 
+    ///
     /// # Examples
     /// ```
     /// use rut::objects::ObjectId;
-    /// 
+    ///
     /// let id = ObjectId::from_sha("a94a8fe5ccb19ba61c4c0873d391e987982fbbd3").unwrap();
     /// assert_eq!(id.to_string(), "a94a8fe5ccb19ba61c4c0873d391e987982fbbd3");
     /// ```
@@ -50,11 +50,11 @@ impl ObjectId {
     }
 
     /// Turn a string that is the utf8 encoded version of a sha1 hash into an ObjectId.
-    /// 
+    ///
     /// # Examples
     /// ```
     /// use rut::objects::ObjectId;
-    /// 
+    ///
     /// let bytes = "a94a8fe5ccb19ba61c4c0873d391e987982fbbd3".as_bytes();
     /// let id = ObjectId::from_utf8_encoded_sha(bytes).unwrap();
     /// assert_eq!(id.to_string(), "a94a8fe5ccb19ba61c4c0873d391e987982fbbd3");
@@ -65,11 +65,11 @@ impl ObjectId {
     }
 
     /// Turn bytes into an ObjectId. This is the inverse of bytes().
-    /// 
+    ///
     /// # Examples
     /// ```
     /// use rut::objects::ObjectId;
-    /// 
+    ///
     /// let bytes = "a94a8fe5ccb19ba61c4c0873d391e987982fbbd3".as_bytes();
     /// let id = ObjectId::from_sha_bytes(bytes).unwrap();
     /// assert_eq!(id.bytes(), bytes);

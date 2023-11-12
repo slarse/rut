@@ -178,7 +178,7 @@ impl Index {
     /// We need to discard any new entries that conflict with existing ones. For example, given an
     /// existing entry `file.txt`, adding a new entry for `file.txt/nested.txt` (i.e. there's now a
     /// directory called `file.txt` with a file `nested.txt` in it), we need to remove `file.txt`.
-    /// 
+    ///
     /// Similarly, given an existing entry `nested/dir/file.txt` and adding an entry `nested`, we
     /// expect `nested/dir/file.txt` to be removed from the index.
     fn discard_conflicting_entries<P: AsRef<Path>>(&mut self, path: P) {

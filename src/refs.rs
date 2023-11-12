@@ -53,8 +53,7 @@ impl<'a> RefHandler<'a> {
             return Err(Error::new(io::ErrorKind::Other, message));
         };
 
-        ObjectId::from_sha(&result)
-            .map_err(|parse_error| Error::new(io::ErrorKind::Other, parse_error))
+        ObjectId::from_sha(&result).map_err(|err| Error::new(io::ErrorKind::Other, err.to_string()))
     }
 
     pub fn write_ref(&self, ref_name: &str, object_id: &ObjectId) -> io::Result<()> {
@@ -98,6 +97,12 @@ impl<'a> RefHandler<'a> {
 pub enum ParseRevisionError {
     InvalidFormat(String),
     // You can add more specific error types as needed
+}
+
+impl From<ParseRevisionError> for std::io::Error {
+    fn from(error: ParseRevisionError) -> Self {
+        io::Error::new(io::ErrorKind::Other, error.to_string())
+    }
 }
 
 impl fmt::Display for ParseRevisionError {
@@ -175,7 +180,10 @@ impl Revision {
         let err = |revision: &Revision| {
             Error::new(
                 ErrorKind::Other,
-                format!("fatal: ambiguous argument '{:?}': unknown revision", revision),
+                format!(
+                    "fatal: ambiguous argument '{:?}': unknown revision",
+                    revision
+                ),
             )
         };
 
@@ -184,16 +192,16 @@ impl Revision {
             Revision::Parent(revision) => {
                 let oid = revision.resolve(repository)?;
                 let commit = repository.database.load_commit(&oid)?;
-                commit.parent.ok_or_else(|| { err(revision) })
+                commit.parent.ok_or_else(|| err(revision))
             }
             Revision::Ancestor(revision, count) => {
                 let oid = revision.resolve(repository)?;
                 let commit = repository.database.load_commit(&oid)?;
-                let mut parent_oid = commit.parent.ok_or_else(|| { err(revision) })?;
+                let mut parent_oid = commit.parent.ok_or_else(|| err(revision))?;
 
                 for _ in 1..*count {
                     let parent_commit = repository.database.load_commit(&parent_oid)?;
-                    parent_oid = parent_commit.parent.ok_or_else(|| { err(revision) })?;
+                    parent_oid = parent_commit.parent.ok_or_else(|| err(revision))?;
                 }
 
                 Ok(parent_oid)
