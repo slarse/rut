@@ -9,7 +9,7 @@ use regex::Regex;
 
 use crate::file;
 use crate::hex;
-use crate::objects::ObjectId;
+use crate::objects::{GitObject, ObjectId};
 use crate::workspace::Repository;
 
 pub struct RefHandler<'a> {
@@ -46,6 +46,8 @@ impl<'a> RefHandler<'a> {
             reference.to_owned()
         } else if ref_file.is_file() {
             fs::read_to_string(&ref_file).map(|content| content.trim().to_owned())?
+        } else if let Some(oid) = self.repository.database.prefix_match(reference) {
+            self.repository.database.load_commit(&oid)?.id().to_string()
         } else {
             let message = format!("Could not dereference ref {}", reference);
             return Err(crate::Error::Fatal(None, message));

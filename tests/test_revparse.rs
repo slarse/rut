@@ -64,3 +64,20 @@ fn test_parse_branch() -> rut::Result<()> {
 
     Ok(())
 }
+
+#[test]
+fn test_parse_short_commit_id() -> rut::Result<()> {
+    // arrange
+    let repository = rut_testhelpers::create_repository();
+    let commit_oid = rut_testhelpers::rut_commit("Initial commit", &repository)?;
+    let short_commit_oid = &commit_oid[..7];
+
+    // act
+    let command = format!("rev-parse {}", short_commit_oid);
+    let output = rut_testhelpers::run_command_string(command, &repository)?;
+
+    // assert
+    assert_eq!(output, format!("{}\n", &commit_oid));
+
+    Ok(())
+}

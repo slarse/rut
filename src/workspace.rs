@@ -56,6 +56,39 @@ impl Database {
         Ok(compressed_bytes)
     }
 
+    /// Find an object by a shortened commit id.
+    /// TODO handle ambiguous short commit ids
+    pub fn prefix_match(&self, short_commit_id: &str) -> Option<ObjectId> {
+        let objects_dir = self.git_dir.join("objects");
+
+        let prefix_dirs = objects_dir
+            .read_dir()
+            .ok()?
+            .map(|entry| entry.ok())
+            .flatten();
+
+        for prefix_dir in prefix_dirs {
+            let objects = objects_dir
+                .join(prefix_dir.file_name())
+                .read_dir()
+                .ok()?
+                .map(|entry| entry.ok())
+                .flatten();
+
+            for object in objects {
+                let mut oid = prefix_dir.file_name();
+                oid.push(object.file_name());
+                let oid = oid.to_str()?;
+                if oid.starts_with(short_commit_id) {
+                    let object_id = ObjectId::from_sha(oid).ok()?;
+                    return Some(object_id);
+                }
+            }
+        }
+
+        None
+    }
+
     pub fn load_commit(&self, commit_id: &ObjectId) -> io::Result<Commit> {
         let content = self.load_data(commit_id)?;
         Ok(self.parse_commit(&mut content.into_iter()))
