@@ -42,15 +42,26 @@ impl<'a> RefHandler<'a> {
             .join("refs/heads/")
             .join(trimmed_reference);
 
+        let error = Err(crate::Error::Fatal(
+            None,
+            format!(
+                "ambiguous argument '{}': unknown revision or path not in the working tree.",
+                reference
+            ),
+        ));
+
         let result = if reference.len() == SHA1_SIZE {
             reference.to_owned()
         } else if ref_file.is_file() {
             fs::read_to_string(&ref_file).map(|content| content.trim().to_owned())?
-        } else if let Some(oid) = self.repository.database.prefix_match(reference) {
-            oid.to_string()
+        } else if let Ok(mut oids) = self.repository.database.prefix_match(reference) {
+            if oids.len() == 1 {
+                return Ok(oids.pop().unwrap());
+            } else {
+                return error;
+            }
         } else {
-            let message = format!("Could not dereference ref {}", reference);
-            return Err(crate::Error::Fatal(None, message));
+            return error;
         };
 
         ObjectId::from_sha(&result).map_err(|err| crate::Error::Fatal(None, err))

@@ -81,3 +81,29 @@ fn test_parse_short_commit_id() -> rut::Result<()> {
 
     Ok(())
 }
+
+#[test]
+fn test_error_on_ambiguous_id() -> rut::Result<()> {
+    // arrange
+    let repository = rut_testhelpers::create_repository();
+
+    // object hashes of a file with just a "b" and a file with just an "f" both start on 6
+    rut_testhelpers::rut_commit("b", &repository)?;
+    rut_testhelpers::rut_commit("f", &repository)?;
+
+    // act
+    let result = rut_testhelpers::run_command_string("rev-parse 6", &repository);
+
+    // assert
+    match result {
+        Ok(_) => panic!("expected error on ambiguous id"),
+        Err(error) => {
+            let message = error.to_string();
+            let expected_message =
+                "fatal: ambiguous argument '6': unknown revision or path not in the working tree.";
+            assert_eq!(message, expected_message);
+        }
+    }
+
+    Ok(())
+}

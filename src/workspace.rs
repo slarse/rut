@@ -56,37 +56,38 @@ impl Database {
         Ok(compressed_bytes)
     }
 
-    /// Find an object by a shortened commit id.
-    /// TODO handle ambiguous short commit ids
-    pub fn prefix_match(&self, short_commit_id: &str) -> Option<ObjectId> {
+    /// Expand the start of an object id into a full object id, if it is unambiguous.
+    pub fn prefix_match(&self, id_prefix: &str) -> crate::Result<Vec<ObjectId>> {
         let objects_dir = self.git_dir.join("objects");
 
-        let prefix_dirs = objects_dir
-            .read_dir()
-            .ok()?
-            .map(|entry| entry.ok())
-            .flatten();
+        let prefix_dirs = objects_dir.read_dir()?.filter_map(|entry| entry.ok());
 
+        let mut all_matches: Vec<ObjectId> = vec![];
         for prefix_dir in prefix_dirs {
-            let objects = objects_dir
-                .join(prefix_dir.file_name())
-                .read_dir()
-                .ok()?
-                .map(|entry| entry.ok())
-                .flatten();
+            for file in objects_dir.join(prefix_dir.file_name()).read_dir()? {
+                let file = file?;
+                let mut raw_oid = prefix_dir.file_name();
+                raw_oid.push(file.file_name());
 
-            for object in objects {
-                let mut oid = prefix_dir.file_name();
-                oid.push(object.file_name());
-                let oid = oid.to_str()?;
-                if oid.starts_with(short_commit_id) {
-                    let object_id = ObjectId::from_sha(oid).ok()?;
-                    return Some(object_id);
+                if !raw_oid.to_str().unwrap_or("").starts_with(id_prefix) {
+                    continue;
                 }
+
+                let oid = ObjectId::from_sha(raw_oid.to_str().unwrap()).map_err(|_| {
+                    crate::Error::Fatal(
+                        None,
+                        format!(
+                            "Failed to parse object id from {}",
+                            raw_oid.to_str().unwrap()
+                        ),
+                    )
+                })?;
+
+                all_matches.push(oid);
             }
         }
 
-        None
+        Ok(all_matches)
     }
 
     pub fn load_commit(&self, commit_id: &ObjectId) -> io::Result<Commit> {
