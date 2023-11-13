@@ -148,7 +148,7 @@ pub struct StdoutWriter {
 
 impl Default for StdoutWriter {
     fn default() -> Self {
-        Self::new()
+        Self::new(true)
     }
 }
 
@@ -157,12 +157,16 @@ extern "C" {
 }
 
 impl StdoutWriter {
-    pub fn new() -> Self {
+    pub fn new(use_pager: bool) -> Self {
         let stdout_fd = io::stdout().as_raw_fd();
         let isatty = unsafe { isatty(stdout_fd) } != 0;
         Self {
             isatty,
-            pager: Self::create_pager(),
+            pager: if use_pager {
+                Self::create_pager()
+            } else {
+                None
+            },
         }
     }
 

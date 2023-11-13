@@ -12,7 +12,8 @@ pub fn main() {
 
 fn internal_main() -> i32 {
     let args: Vec<String> = env::args().collect();
-    let mut writer = StdoutWriter::new();
+
+    let mut writer = StdoutWriter::new(!args.contains(&"--help".to_string()));
 
     let workdir = match env::current_dir() {
         Ok(dir) => dir,
@@ -22,7 +23,9 @@ fn internal_main() -> i32 {
     match cli::run_command(args, workdir, &mut writer) {
         Ok(_) => 0,
         Err(fatal @ rut::Error::Fatal(_, _)) => {
-            writer.writeln(format!("{}", fatal)).expect("Failed to write to stdout");
+            writer
+                .writeln(format!("{}", fatal))
+                .expect("Failed to write to stdout");
             1
         }
         err @ Err(_) => panic!("something went horribly wrong: {:?}", err),
