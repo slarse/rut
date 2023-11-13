@@ -73,9 +73,9 @@ pub fn rut_commit(commit_message: &str, repository: &Repository) -> rut::Result<
         .unwrap();
     commit::commit(&repository, &options, &mut NoopOutputWriter)?;
 
-    // sleep a little to ensure that we get a strict "happens-after" relationship the commit
-    // and anything that follows it
-    thread::sleep(std::time::Duration::from_millis(10));
+    // sleep a little to ensure that we get a reasonably strict "happens-after" relationship the
+    // commit and anything that follows it
+    thread::sleep(std::time::Duration::from_millis(50));
     Ok(get_head_commit(&repository.git_dir()))
 }
 
