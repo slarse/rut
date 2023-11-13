@@ -81,9 +81,9 @@ impl<'a> RefHandler<'a> {
         match result {
             Err(error) if error.kind() == io::ErrorKind::AlreadyExists => {
                 let message = format!("a branch named '{}' already exists", ref_name);
-                return Err(crate::Error::Fatal(Some(Box::new(error)), message));
+                Err(crate::Error::Fatal(Some(Box::new(error)), message))
             }
-            other => return Ok(other?),
+            other => Ok(other?),
         }
     }
 
@@ -165,7 +165,7 @@ impl Revision {
         let ancestor_regex = Regex::new(ANCESTOR_PATTERN).unwrap();
         let err = ParseRevisionError::InvalidFormat(s.to_owned());
 
-        if let Some(group) = parent_regex.captures(s).map(|g| g.get(1)).flatten() {
+        if let Some(group) = parent_regex.captures(s).and_then(|g| g.get(1)) {
             let nested_rev = Revision::parse(group.as_str())?;
             Ok(Revision::Parent(Box::new(nested_rev)))
         } else if let Some(matches) = ancestor_regex.captures(s) {

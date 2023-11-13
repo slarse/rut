@@ -18,7 +18,7 @@ pub fn branch(options: &Options, repository: &Repository) -> crate::Result<()> {
             None => refs.head()?,
         };
 
-        return refs.create_ref(&name, &start_point);
+        return refs.create_ref(name, &start_point);
     }
 
     Ok(())
