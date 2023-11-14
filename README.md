@@ -75,7 +75,7 @@ Rut currently supports the following subset of Git:
     - Shows the Git log starting from HEAD
     - Accepts the `-n <number>` option to limit the amount of logged commits
     - Accepts the `--oneline` flag to produce abbreviated output
-
-## Upcoming features
-
-I'm working on improving the `diff` and `restore` commands.
+* `rev-parse`
+    - Parse a revision to an object id
+* `branch`
+    - Create a new branch
