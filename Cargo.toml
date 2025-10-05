@@ -1,19 +1,19 @@
 [package]
 name = "rut"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 sha1 = "0.10"
-flate2 = "1.0"
+flate2 = "1.1"
 walkdir = "2"
-derive_builder = "0.12"
-clap = { version = "4.1.11", features = ["derive"] }
-chrono = "0.4.24"
-rust-ini = "0.19.0"
-regex = "1.10.2"
+derive_builder = "0.20"
+clap = { version = "4.5.48", features = ["derive"] }
+chrono = "0.4.42"
+rust-ini = "0.21.3"
+regex = "1.11.3"
 
 [dev-dependencies]
 rut_testhelpers = { path = "libs/rut_testhelpers" }

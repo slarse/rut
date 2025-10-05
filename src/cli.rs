@@ -152,7 +152,7 @@ impl Default for StdoutWriter {
     }
 }
 
-extern "C" {
+unsafe extern "C" {
     fn isatty(fd: c_int) -> c_int;
 }
 

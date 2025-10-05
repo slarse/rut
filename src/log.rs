@@ -118,9 +118,9 @@ pub fn to_local_timestring(timestamp: u64) -> Option<String> {
     let datetime =
         local_time
             .timezone()
-            .from_utc_datetime(&chrono::NaiveDateTime::from_timestamp_opt(
+            .from_utc_datetime(&chrono::DateTime::from_timestamp(
                 timestamp as i64,
                 0,
-            )?);
+            )?.naive_utc());
     Some(datetime.format("%a %b%e %T %Y %z").to_string())
 }
