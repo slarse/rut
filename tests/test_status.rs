@@ -239,7 +239,10 @@ fn test_human_readable_format() -> rut::Result<()> {
     // act
     let output = rut_testhelpers::rut_status(&repository, &options)?;
 
-    assert_eq!(output, "Changes to be committed:\n\tnew file: staged.txt\n\nChanges not staged for commit:\n\tmodified: modified.txt\n\nUntracked files:\n\tuntracked.txt\n\n");
+    assert_eq!(
+        output,
+        "Changes to be committed:\n\tnew file: staged.txt\n\nChanges not staged for commit:\n\tmodified: modified.txt\n\nUntracked files:\n\tuntracked.txt\n\n"
+    );
 
     Ok(())
 }

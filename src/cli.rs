@@ -1,4 +1,4 @@
-use std::ffi::{c_int, OsString};
+use std::ffi::{OsString, c_int};
 use std::fmt::Debug;
 use std::io::{Error, Write};
 use std::os::unix::io::AsRawFd;

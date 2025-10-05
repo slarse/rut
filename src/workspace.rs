@@ -1,15 +1,15 @@
 use std::fs;
 use std::fs::File;
 use std::io;
-use std::io::prelude::*;
 use std::io::BufReader;
+use std::io::prelude::*;
 use std::path::Path;
 use std::path::PathBuf;
 use std::str;
 
+use flate2::Compression;
 use flate2::bufread::ZlibDecoder;
 use flate2::write::ZlibEncoder;
-use flate2::Compression;
 
 use crate::config;
 use crate::config::Config;

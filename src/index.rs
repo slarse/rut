@@ -220,15 +220,15 @@ impl Index {
     }
 
     fn remove_from_directories_map(&mut self, path: &Path) {
-        if let Some(parent) = path.parent() {
-            if let Some(parent_children) = self.directories.get_mut(parent) {
-                let filename = path.file_name().unwrap().to_str().unwrap();
-                parent_children.remove(filename);
+        if let Some(parent) = path.parent()
+            && let Some(parent_children) = self.directories.get_mut(parent)
+        {
+            let filename = path.file_name().unwrap().to_str().unwrap();
+            parent_children.remove(filename);
 
-                if parent_children.is_empty() {
-                    self.directories.remove(parent);
-                    self.remove_from_directories_map(parent);
-                }
+            if parent_children.is_empty() {
+                self.directories.remove(parent);
+                self.remove_from_directories_map(parent);
             }
         }
     }

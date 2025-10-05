@@ -115,12 +115,8 @@ fn write_branch(branch: &str, writer: &mut dyn OutputWriter) -> io::Result<()> {
 
 pub fn to_local_timestring(timestamp: u64) -> Option<String> {
     let local_time = Local::now();
-    let datetime =
-        local_time
-            .timezone()
-            .from_utc_datetime(&chrono::DateTime::from_timestamp(
-                timestamp as i64,
-                0,
-            )?.naive_utc());
+    let datetime = local_time
+        .timezone()
+        .from_utc_datetime(&chrono::DateTime::from_timestamp(timestamp as i64, 0)?.naive_utc());
     Some(datetime.format("%a %b%e %T %Y %z").to_string())
 }
