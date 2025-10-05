@@ -3,6 +3,8 @@ use std::path::Component;
 use std::time::{SystemTime, UNIX_EPOCH};
 use std::{fs, io, path::PathBuf};
 
+use chrono::Local;
+
 use crate::hex::to_hex_string;
 use crate::index::{FileMode, Index, IndexEntry};
 use crate::objects::{Author, Commit, GitObject, ObjectId, Tree, TreeEntry};
@@ -75,7 +77,9 @@ fn create_commit_with_tree(
         .unwrap()
         .as_secs();
 
-    Commit::new(tree.clone(), author, message, parent, timestamp)
+    let offset = Local::now().format("%z").to_string();
+
+    Commit::new(tree.clone(), author, message, parent, timestamp, offset)
 }
 
 fn write_commit_status(commit: &Commit, writer: &mut dyn OutputWriter) -> io::Result<()> {

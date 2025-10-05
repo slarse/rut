@@ -255,6 +255,7 @@ pub struct Commit {
     pub message: String,
     pub parent: Option<ObjectId>,
     pub timestamp: u64,
+    pub offset: String,
     id: ObjectId,
 }
 
@@ -265,9 +266,10 @@ impl Commit {
         message: String,
         parent: Option<ObjectId>,
         timestamp: u64,
+        offset: String,
     ) -> Self {
         let object_format =
-            Self::to_object_format(&tree, &author, &message, parent.as_ref(), timestamp);
+            Self::to_object_format(&tree, &author, &message, parent.as_ref(), timestamp, &offset);
         let hash = hashing::sha1_hash(&object_format);
         let id = ObjectId::from_sha_bytes(&hash).unwrap();
         Self {
@@ -276,6 +278,7 @@ impl Commit {
             message,
             parent,
             timestamp,
+            offset,
             id,
         }
     }
@@ -286,8 +289,8 @@ impl Commit {
         message: &str,
         parent: Option<&ObjectId>,
         timestamp: u64,
+        offset: &str,
     ) -> Vec<u8> {
-        let offset = Local::now().format("%z").to_string();
         let author_with_timestamp = format!("{} {} {}", author, timestamp, offset);
 
         let content = match &parent {
@@ -321,6 +324,7 @@ impl<'a> GitObject<'a> for Commit {
             &self.message,
             self.parent.as_ref(),
             self.timestamp,
+            &self.offset,
         )
     }
 }

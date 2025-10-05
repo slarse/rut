@@ -1,15 +1,15 @@
 use std::fs;
 use std::fs::File;
 use std::io;
-use std::io::BufReader;
 use std::io::prelude::*;
+use std::io::BufReader;
 use std::path::Path;
 use std::path::PathBuf;
 use std::str;
 
-use flate2::Compression;
 use flate2::bufread::ZlibDecoder;
 use flate2::write::ZlibEncoder;
+use flate2::Compression;
 
 use crate::config;
 use crate::config::Config;
@@ -149,7 +149,7 @@ impl Database {
         let parent = self
             .parse_parent(parent_line.as_ref())
             .map(|parent| ObjectId::from_sha(&parent).unwrap());
-        let (author_name, author_email, timestamp) = parse_author_details(&author_line);
+        let (author_name, author_email, timestamp, offset) = parse_author_details(&author_line);
 
         let tree_object_id_bytes: Vec<u8> = tree_line
             .into_iter()
@@ -169,7 +169,7 @@ impl Database {
             email: author_email,
         };
 
-        Commit::new(tree_object_id, author, message, parent, timestamp)
+        Commit::new(tree_object_id, author, message, parent, timestamp, offset)
     }
 
     fn parse_parent(&self, parent_line: Option<&Vec<u8>>) -> Option<String> {
@@ -242,7 +242,7 @@ impl Database {
     }
 }
 
-fn parse_author_details(author_line: &[u8]) -> (String, String, u64) {
+fn parse_author_details(author_line: &[u8]) -> (String, String, u64, String) {
     let line_as_str = str::from_utf8(author_line).unwrap();
     let mut chars = line_as_str.chars().skip_while(|chr| chr != &' ');
     let name: String = take_while(&mut chars, |chr| *chr != '<').iter().collect();
@@ -255,7 +255,17 @@ fn parse_author_details(author_line: &[u8]) -> (String, String, u64) {
         .collect::<String>()
         .parse::<u64>()
         .unwrap_or(0);
-    (name.trim().to_owned(), email.trim().to_owned(), timestamp)
+
+    let offset = take_while(&mut chars, is_not_space)
+        .iter()
+        .collect::<String>();
+
+    (
+        name.trim().to_owned(),
+        email.trim().to_owned(),
+        timestamp,
+        offset,
+    )
 }
 
 fn parse_tree_entries(content: &mut impl Iterator<Item = u8>) -> Vec<TreeEntry> {
@@ -454,6 +464,7 @@ mod tests {
             String::from("Initial commit\n"),
             parent,
             1666811962,
+            "+0200".to_string(),
         )
     }
 }
