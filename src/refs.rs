@@ -25,7 +25,7 @@ const PARENT_PATTERN: &str = r"^(.*)\^$";
 const ANCESTOR_PATTERN: &str = r"^(.*)~(\d+)$";
 
 impl<'a> RefHandler<'a> {
-    pub fn new(repository: &Repository) -> RefHandler {
+    pub fn new(repository: &Repository) -> RefHandler<'_> {
         RefHandler { repository }
     }
 
@@ -111,7 +111,7 @@ pub enum ParseRevisionError {
 
 impl From<ParseRevisionError> for std::io::Error {
     fn from(error: ParseRevisionError) -> Self {
-        io::Error::new(io::ErrorKind::Other, error.to_string())
+        io::Error::other(error.to_string())
     }
 }
 

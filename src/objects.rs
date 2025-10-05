@@ -8,7 +8,7 @@ use crate::hex;
 use crate::index::FileMode;
 
 pub trait GitObject<'a> {
-    fn id(&'a self) -> &ObjectId;
+    fn id(&'a self) -> &'a ObjectId;
 
     fn id_as_string(&'a self) -> String {
         self.id().to_string()
@@ -139,7 +139,7 @@ impl Blob {
 }
 
 impl<'a> GitObject<'a> for Blob {
-    fn id(&'a self) -> &ObjectId {
+    fn id(&'a self) -> &'a ObjectId {
         &self.id
     }
 
@@ -226,7 +226,7 @@ impl Tree {
 }
 
 impl<'a> GitObject<'a> for Tree {
-    fn id(&'a self) -> &ObjectId {
+    fn id(&'a self) -> &'a ObjectId {
         &self.id
     }
 

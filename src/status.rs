@@ -87,7 +87,7 @@ pub fn resolve_files_with_unstaged_changes(
     let unstaged_deletions = resolve_unstaged_deletions(&tracked_paths, repository.worktree());
     let paths_with_unstaged_changes = unstaged_deletions
         .into_iter()
-        .chain(unstaged_modifications.into_iter())
+        .chain(unstaged_modifications)
         .map(|change| worktree.root().join(change.path));
 
     Ok(paths_with_unstaged_changes.collect())
@@ -397,8 +397,8 @@ fn resolve_staged_deletions(
 ) -> Vec<Change> {
     path_to_committed_id
         .keys()
+        .filter(|&path| !index.has_entry(path))
         .cloned()
-        .filter(|path| !index.has_entry(path))
         .map(|path| worktree.root().join(path))
         .map(|path| Change {
             path: worktree.relativize_path(path),

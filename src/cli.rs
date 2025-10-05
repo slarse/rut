@@ -242,6 +242,6 @@ fn resolve_path(path: &str, repository: &Repository) -> io::Result<PathBuf> {
         Ok(resolved)
     } else {
         let message = format!("pathspec {:?} did not match any files", resolved);
-        Err(Error::new(io::ErrorKind::Other, message))
+        Err(Error::other(message))
     }
 }

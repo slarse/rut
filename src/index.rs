@@ -142,7 +142,7 @@ impl Index {
         };
 
         let unpadded_entry_size = position + path_size + 1;
-        let entry_padding = if unpadded_entry_size % 8 != 0 {
+        let entry_padding = if !unpadded_entry_size.is_multiple_of(8) {
             8 - unpadded_entry_size % 8
         } else {
             0
@@ -387,7 +387,7 @@ impl Mode {
 
 fn pad_to_block_size(bytes: &mut Vec<u8>) {
     let block_size = 8;
-    while bytes.len() % block_size != 0 {
+    while !bytes.len().is_multiple_of(block_size) {
         bytes.push(0);
     }
 }

@@ -76,7 +76,7 @@ fn write_log_message(
     branch: Option<&str>,
     writer: &mut dyn OutputWriter,
 ) -> io::Result<()> {
-    let timestamp_parse_error = io::Error::new(io::ErrorKind::Other, "Failed to parse timestamp");
+    let timestamp_parse_error = io::Error::other("Failed to parse timestamp");
 
     writer
         .set_color(Color::Brown)?
