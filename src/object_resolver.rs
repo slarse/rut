@@ -38,6 +38,19 @@ impl<'a> ObjectResolver<'a> {
         Ok(ObjectResolver::new(root_tree, &repository.database))
     }
 
+    pub fn find_tree_by_path(&mut self, path: &Path) -> crate::Result<Tree> {
+        if let Some(tree) = self.trees.get(path) {
+            return Ok(tree.clone());
+        }
+
+        // This is a little hack so I don't have to write more code right now, we try to fetch a
+        // blob inside of the tree we want. This will cause the tree to get cached. It does not
+        // matter if we find the blob or not.
+        _ = self.find_blob_by_path(&path.join("dontcare"));
+        // FIXME prevent endless recursion in case of caching error
+        self.find_tree_by_path(path)
+    }
+
     /// Find a blob by its path, relative to the root tree of this ObjectResolver.
     pub fn find_blob_by_path(&mut self, path: &Path) -> crate::Result<Blob> {
         if let Some(blob) = self.blobs.get(path) {

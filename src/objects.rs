@@ -1,8 +1,6 @@
 use std::path::Path;
 use std::{fmt::Display, str};
 
-use chrono::Local;
-
 use crate::hashing;
 use crate::hex;
 use crate::index::FileMode;
@@ -158,7 +156,7 @@ fn to_object_format(object_type: &str, bytes: &[u8]) -> Vec<u8> {
     object_format
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct TreeEntry {
     pub name: String,
     pub object_id: ObjectId,
@@ -180,10 +178,20 @@ impl TreeEntry {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone)]
 pub struct Tree {
     entries: Vec<TreeEntry>,
     id: ObjectId,
+}
+
+impl PartialEq for Tree {
+    fn eq(&self, other: &Self) -> bool {
+        return self.id == other.id;
+    }
+
+    fn ne(&self, other: &Self) -> bool {
+        return self.id != other.id;
+    }
 }
 
 impl Tree {
@@ -268,8 +276,14 @@ impl Commit {
         timestamp: u64,
         offset: String,
     ) -> Self {
-        let object_format =
-            Self::to_object_format(&tree, &author, &message, parent.as_ref(), timestamp, &offset);
+        let object_format = Self::to_object_format(
+            &tree,
+            &author,
+            &message,
+            parent.as_ref(),
+            timestamp,
+            &offset,
+        );
         let hash = hashing::sha1_hash(&object_format);
         let id = ObjectId::from_sha_bytes(&hash).unwrap();
         Self {

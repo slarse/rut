@@ -39,6 +39,12 @@ enum Action {
         #[arg(long)]
         cached: bool,
     },
+    DiffRefs {
+        #[arg(long)]
+        lhs: String,
+        #[arg(long)]
+        rhs: String,
+    },
     Restore {
         path: String,
         #[arg(long, default_value = "HEAD")]
@@ -135,6 +141,9 @@ pub fn run_command<P: AsRef<Path>, S: Into<OsString> + Clone>(
         }
         Action::RevParse { revision } => {
             revparse::rev_parse(&revision, writer, &repository)?;
+        }
+        Action::DiffRefs { lhs, rhs } => {
+            diff::diff_refs(&repository, lhs, rhs)?;
         }
     }
 

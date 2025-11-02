@@ -1,13 +1,13 @@
 use std::{
     fmt::{Debug, Display},
     fs, io,
-    path::Path,
+    path::{Path, PathBuf},
 };
 
 use crate::{
-    index::{Index, IndexEntry},
+    index::{FileMode, Index, IndexEntry},
     object_resolver::ObjectResolver,
-    objects::{Blob, GitObject},
+    objects::{Blob, GitObject, Tree, TreeEntry},
     output::{Color, OutputWriter},
     status,
     workspace::Repository,
@@ -643,6 +643,114 @@ fn adjust_index<S>(iterable: &[S], index: i32) -> usize {
     } else {
         index
     }) as usize
+}
+
+pub fn diff_refs<S: AsRef<str>>(repository: &Repository, lhs: S, rhs: S) -> crate::Result<()> {
+    let mut lhs_object_resolver = ObjectResolver::from_reference(lhs.as_ref(), repository)?;
+    let mut rhs_object_resolver = ObjectResolver::from_reference(rhs.as_ref(), repository)?;
+
+    let lhs_tree = lhs_object_resolver.find_tree_by_path(&PathBuf::new()).ok();
+    let rhs_tree = rhs_object_resolver.find_tree_by_path(&PathBuf::new()).ok();
+
+    let (deleted, added, changed) = compare_trees(
+        lhs_tree,
+        rhs_tree,
+        PathBuf::new(),
+        &mut lhs_object_resolver,
+        &mut rhs_object_resolver,
+    )?;
+
+    println!("{:?}", added);
+
+    for path in deleted {
+        println!("Deleted");
+        println!("{:?}", path);
+    }
+    for path in added {
+        println!("Added");
+        println!("{:?}", path);
+    }
+    for path in changed {
+        println!("Changed");
+        println!("{:?}", path);
+    }
+
+    Ok(())
+}
+
+pub fn compare_trees(
+    lhs: Option<Tree>,
+    rhs: Option<Tree>,
+    prefix: PathBuf,
+    lhs_resolver: &mut ObjectResolver,
+    rhs_resolver: &mut ObjectResolver,
+) -> io::Result<(Vec<PathBuf>, Vec<PathBuf>, Vec<PathBuf>)> {
+    if lhs == rhs {
+        return Ok((Vec::new(), Vec::new(), Vec::new()));
+    }
+
+    let mut deleted: Vec<PathBuf> = Vec::new();
+    let mut added: Vec<PathBuf> = Vec::new();
+    let mut changed: Vec<PathBuf> = Vec::new();
+
+    let lhs_entries: Vec<&TreeEntry> = lhs
+        .as_ref()
+        .map_or(Vec::new(), |tree| tree.entries().iter().collect());
+    let rhs_entries: Vec<&TreeEntry> = rhs
+        .as_ref()
+        .map_or(Vec::new(), |tree| tree.entries().iter().collect());
+
+    let get_subtree = |entry: &TreeEntry, resolver: &mut ObjectResolver| {
+        if entry.mode == FileMode::Directory {
+            resolver.find_tree_by_path(&prefix.join(&entry.name)).ok()
+        } else {
+            None
+        }
+    };
+
+    // TODO fix performance, this is O(len(lhs_entries)*len(rhs_entries))
+    'outer: for lhs_entry in lhs_entries.iter() {
+        for rhs_entry in rhs_entries.iter() {
+            if lhs_entry.name == rhs_entry.name {
+                if lhs_entry.object_id != rhs_entry.object_id {
+                    if lhs_entry.mode == FileMode::Regular && rhs_entry.mode == FileMode::Regular {
+                        changed.push(prefix.join(&lhs_entry.name));
+                        continue 'outer;
+                    }
+
+                    let lhs_entry_tree = get_subtree(lhs_entry, lhs_resolver);
+                    let rhs_entry_tree = get_subtree(rhs_entry, rhs_resolver);
+
+                    let (sub_deletions, sub_additions, sub_changes) = compare_trees(
+                        rhs_entry_tree,
+                        lhs_entry_tree,
+                        prefix.join(&lhs_entry.name),
+                        lhs_resolver,
+                        rhs_resolver,
+                    )?;
+                    deleted.extend(sub_deletions);
+                    added.extend(sub_additions);
+                    changed.extend(sub_changes);
+                }
+
+                continue 'outer;
+            }
+        }
+
+        deleted.push(prefix.join(&lhs_entry.name));
+    }
+
+    'outer: for rhs_entry in rhs_entries.iter() {
+        for lhs_entry in lhs_entries.iter() {
+            if lhs_entry.name == rhs_entry.name {
+                continue 'outer;
+            }
+        }
+
+        added.push(prefix.join(&rhs_entry.name))
+    }
+
+    return Ok((deleted, added, changed));
 }
 
 #[cfg(test)]
