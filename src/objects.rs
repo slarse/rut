@@ -186,11 +186,7 @@ pub struct Tree {
 
 impl PartialEq for Tree {
     fn eq(&self, other: &Self) -> bool {
-        return self.id == other.id;
-    }
-
-    fn ne(&self, other: &Self) -> bool {
-        return self.id != other.id;
+        self.id == other.id
     }
 }
 

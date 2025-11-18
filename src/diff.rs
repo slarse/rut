@@ -680,11 +680,10 @@ pub fn diff_refs<S: AsRef<str>>(
     )?;
 
     let bytes_to_lines = |bytes: &[u8]| {
-        let lines = bytes
+        bytes
             .lines()
             .map(|s| s.map(|s| s.to_owned()))
-            .collect::<Result<Vec<String>, std::io::Error>>();
-        lines
+            .collect::<Result<Vec<String>, std::io::Error>>()
     };
 
     for change in changes {
@@ -813,7 +812,7 @@ pub fn compare_trees(
         });
     }
 
-    return Ok(changes);
+    Ok(changes)
 }
 
 #[cfg(test)]
