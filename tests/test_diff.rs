@@ -194,6 +194,63 @@ index 9649cde..0000000
     Ok(())
 }
 
+#[test]
+fn test_diff_refs() -> rut::Result<()> {
+    // arrange
+    let repository = rut_testhelpers::create_repository();
+    let file = repository.worktree().root().join("file.txt");
+
+    let commit_and_blob_ids = ["First", "Second"]
+        .into_iter()
+        .map(|s| -> rut::Result<(String, String)> {
+            fs::write(&file, s)?;
+            rut_testhelpers::rut_add(&file, &repository);
+            let commit_id = rut_testhelpers::rut_commit(s, &repository)?;
+            let blob = rut::objects::Blob::new(s.as_bytes().to_vec());
+            Ok((commit_id, blob.id().to_short_string()))
+        })
+        .collect::<rut::Result<Vec<(String, String)>>>()?;
+
+    let (first_commit_id, first_blob_id) = &commit_and_blob_ids[0];
+    let (second_commit_id, second_blob_id) = &commit_and_blob_ids[1];
+
+    // act
+    let output_forward = rut_testhelpers::run_command_string(
+        format!("diff {first_commit_id} {second_commit_id}"),
+        &repository,
+    )?;
+    let output_reversed = rut_testhelpers::run_command_string(
+        format!("diff {second_commit_id} {first_commit_id}"),
+        &repository,
+    )?;
+
+    let expected_output_forward = format!(
+        "diff --git a/file.txt b/file.txt
+index {first_blob_id}..{second_blob_id}
+--- a/file.txt
++++ b/file.txt
+@@ -1 +1 @@
+-First
++Second
+"
+    );
+    let expected_output_reversed = format!(
+        "diff --git a/file.txt b/file.txt
+index {second_blob_id}..{first_blob_id}
+--- a/file.txt
++++ b/file.txt
+@@ -1 +1 @@
+-Second
++First
+"
+    );
+
+    assert_eq!(output_forward, expected_output_forward);
+    assert_eq!(output_reversed, expected_output_reversed);
+
+    Ok(())
+}
+
 fn create_committed_file_with_staged_changes(
     repository: &Repository,
     file: &Path,

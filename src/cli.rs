@@ -10,10 +10,10 @@ use std::io;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 
-use clap::{Parser, Subcommand};
+use clap::{CommandFactory, Parser, Subcommand};
 
 #[derive(Parser, Debug)]
-struct Args {
+struct Arguments {
     #[command(subcommand)]
     action: Action,
 }
@@ -36,14 +36,14 @@ enum Action {
         porcelain: bool,
     },
     Diff {
+        /// First reference
+        reference: Option<String>,
+
+        /// Second reference
+        other_reference: Option<String>,
+
         #[arg(long)]
         cached: bool,
-    },
-    DiffRefs {
-        #[arg(long)]
-        lhs: String,
-        #[arg(long)]
-        rhs: String,
     },
     Restore {
         path: String,
@@ -74,7 +74,7 @@ pub fn run_command<P: AsRef<Path>, S: Into<OsString> + Clone>(
 
     let repository = Repository::from_worktree_root(workdir);
 
-    let args = Args::parse_from(args);
+    let args = Arguments::parse_from(args);
 
     match args.action {
         Action::Init => {
@@ -103,7 +103,26 @@ pub fn run_command<P: AsRef<Path>, S: Into<OsString> + Clone>(
             };
             status::status(&repository, &options, writer)?;
         }
-        Action::Diff { cached } => {
+        Action::Diff {
+            cached,
+            reference,
+            other_reference,
+        } => {
+            if let Some(reference) = reference {
+                // Currently, if reference is specified, we require the other reference also to be
+                // specified.
+                let Some(other_reference) = other_reference else {
+                    let mut cmd = Arguments::command();
+                    let error = cmd.error(
+                        clap::error::ErrorKind::ArgumentConflict,
+                        "must provide [other_reference] if [reference] is provided",
+                    );
+                    return Err(crate::error::Error::Clap(error));
+                };
+
+                return diff::diff_refs(&repository, reference, other_reference, writer);
+            }
+
             let options = diff::OptionsBuilder::default()
                 .cached(cached)
                 .build()
@@ -141,9 +160,6 @@ pub fn run_command<P: AsRef<Path>, S: Into<OsString> + Clone>(
         }
         Action::RevParse { revision } => {
             revparse::rev_parse(&revision, writer, &repository)?;
-        }
-        Action::DiffRefs { lhs, rhs } => {
-            diff::diff_refs(&repository, lhs, rhs)?;
         }
     }
 

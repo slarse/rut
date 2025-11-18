@@ -7,6 +7,7 @@ pub enum Error {
     Io(io::Error),
     ParseRevision(ParseRevisionError),
     Fatal(Option<Box<dyn std::error::Error>>, String),
+    Clap(clap::error::Error),
 }
 
 impl std::error::Error for Error {
@@ -16,6 +17,7 @@ impl std::error::Error for Error {
             Error::ParseRevision(err) => Some(err),
             Error::Fatal(Some(err), _) => err.source(),
             Error::Fatal(None, _) => None,
+            Error::Clap(err) => err.source(),
         }
     }
 }
@@ -26,6 +28,7 @@ impl fmt::Display for Error {
             Error::Io(err) => write!(f, "Unhandled IO error: {}", err),
             Error::ParseRevision(err) => write!(f, "Unhandled parse error: {}", err),
             Error::Fatal(_, msg) => write!(f, "fatal: {}", msg),
+            Error::Clap(err) => write!(f, "{err}"),
         }
     }
 }

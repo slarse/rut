@@ -1,6 +1,7 @@
 use std::{
     fmt::{Debug, Display},
-    fs, io,
+    fs,
+    io::{self, BufRead},
     path::{Path, PathBuf},
 };
 
@@ -168,15 +169,20 @@ fn diff_blobs(
     Ok(())
 }
 
-fn diff_content(
+fn diff_content<T: AsRef<str> + Eq>(
     relative_path: &Path,
-    a_lines: &[&str],
+    a_lines: &[T],
     a_oid: Option<String>,
-    b_lines: &[&str],
+    b_lines: &[T],
     b_oid: Option<String>,
     writer: &mut dyn OutputWriter,
 ) -> crate::Result<()> {
-    let edit_script = edit_script(a_lines, b_lines);
+    // TODO can this be optimized away somehow? Perhaps pass in iterators instead of materialized
+    // vectors/slices?
+    let a_lines: Vec<&str> = a_lines.iter().map(|line| line.as_ref()).collect();
+    let b_lines: Vec<&str> = b_lines.iter().map(|line| line.as_ref()).collect();
+
+    let edit_script = edit_script(&a_lines, &b_lines);
     let chunks = chunk_edit_script(&edit_script, MAX_DIFF_CONTEXT_LINES);
 
     write_header(relative_path, a_oid, b_oid, writer)?;
@@ -185,22 +191,25 @@ fn diff_content(
     Ok(())
 }
 
-fn write_chunks(chunks: &Vec<Chunk<&str>>, writer: &mut dyn OutputWriter) -> io::Result<()> {
+fn write_chunks<T: AsRef<str> + Eq>(
+    chunks: &Vec<Chunk<T>>,
+    writer: &mut dyn OutputWriter,
+) -> io::Result<()> {
     for chunk in chunks {
         write_chunk_header(chunk, writer)?;
         for edit in &chunk.edits {
             match edit.kind {
                 EditKind::Equal => {
-                    writer.writeln(format!(" {}", edit.content))?;
+                    writer.writeln(format!(" {}", edit.content.as_ref()))?;
                 }
                 EditKind::Deletion => {
                     writer.set_color(Color::Red)?;
-                    writer.writeln(format!("-{}", edit.content))?;
+                    writer.writeln(format!("-{}", edit.content.as_ref()))?;
                     writer.reset_formatting()?;
                 }
                 EditKind::Addition => {
                     writer.set_color(Color::Green)?;
-                    writer.writeln(format!("+{}", edit.content))?;
+                    writer.writeln(format!("+{}", edit.content.as_ref()))?;
                     writer.reset_formatting()?;
                 }
             }
@@ -263,8 +272,9 @@ fn write_header<'a>(
         ))?
         .writeln(format!(
             "index {}..{}",
-            a_oid.unwrap_or_else(|| "0000000".to_string()),
-            b_oid.unwrap_or_else(|| "0000000".to_string())
+            // FIXME don't hard-code short-form length here
+            &a_oid.unwrap_or_else(|| "0000000".to_string())[..=6],
+            &b_oid.unwrap_or_else(|| "0000000".to_string())[..=6]
         ))?
         .writeln(format!("--- {}", a_path))?
         .writeln(format!("+++ {}", b_path))
@@ -325,13 +335,13 @@ impl<'a, S: Eq> Chunk<'a, S> {
     }
 }
 
-fn chunk_edit_script<'a>(
-    edit_script: &'a [Edit<&'a str>],
+fn chunk_edit_script<'a, T: AsRef<str> + Eq>(
+    edit_script: &'a [Edit<T>],
     context_size: usize,
-) -> Vec<Chunk<'a, &'a str>> {
-    let mut chunks = vec![];
-    let mut chunk_content: Vec<&Edit<&str>> = vec![];
-    let mut context: Vec<&Edit<&str>> = vec![];
+) -> Vec<Chunk<'a, T>> {
+    let mut chunks: Vec<Chunk<T>> = vec![];
+    let mut chunk_content: Vec<&Edit<T>> = vec![];
+    let mut context: Vec<&Edit<T>> = vec![];
 
     let mut last_mutating_edit_idx = 0;
 
@@ -373,11 +383,15 @@ fn chunk_edit_script<'a>(
     chunks
 }
 
-fn should_show(edit: &Edit<&str>, position: usize, edit_script_size: usize) -> bool {
+fn should_show<T: AsRef<str> + Eq>(
+    edit: &Edit<T>,
+    position: usize,
+    edit_script_size: usize,
+) -> bool {
     if position < edit_script_size - 1 {
         true
     } else {
-        !edit.content.is_empty()
+        !edit.content.as_ref().is_empty()
     }
 }
 
@@ -645,14 +659,19 @@ fn adjust_index<S>(iterable: &[S], index: i32) -> usize {
     }) as usize
 }
 
-pub fn diff_refs<S: AsRef<str>>(repository: &Repository, lhs: S, rhs: S) -> crate::Result<()> {
+pub fn diff_refs<S: AsRef<str>>(
+    repository: &Repository,
+    lhs: S,
+    rhs: S,
+    writer: &mut dyn OutputWriter,
+) -> crate::Result<()> {
     let mut lhs_object_resolver = ObjectResolver::from_reference(lhs.as_ref(), repository)?;
     let mut rhs_object_resolver = ObjectResolver::from_reference(rhs.as_ref(), repository)?;
 
     let lhs_tree = lhs_object_resolver.find_tree_by_path(&PathBuf::new()).ok();
     let rhs_tree = rhs_object_resolver.find_tree_by_path(&PathBuf::new()).ok();
 
-    let (deleted, added, changed) = compare_trees(
+    let changes = compare_trees(
         lhs_tree,
         rhs_tree,
         PathBuf::new(),
@@ -660,19 +679,55 @@ pub fn diff_refs<S: AsRef<str>>(repository: &Repository, lhs: S, rhs: S) -> crat
         &mut rhs_object_resolver,
     )?;
 
-    println!("{:?}", added);
+    let bytes_to_lines = |bytes: &[u8]| {
+        let lines = bytes
+            .lines()
+            .map(|s| s.map(|s| s.to_owned()))
+            .collect::<Result<Vec<String>, std::io::Error>>();
+        lines
+    };
 
-    for path in deleted {
-        println!("Deleted");
-        println!("{:?}", path);
-    }
-    for path in added {
-        println!("Added");
-        println!("{:?}", path);
-    }
-    for path in changed {
-        println!("Changed");
-        println!("{:?}", path);
+    for change in changes {
+        match change.change_type {
+            status::ChangeType::Created => {
+                let rhs_blob = rhs_object_resolver.find_blob_by_path(&change.path)?;
+                let rhs_blob_lines: Vec<String> = bytes_to_lines(rhs_blob.content())?;
+                diff_content(
+                    &change.path,
+                    &[],
+                    None,
+                    &rhs_blob_lines,
+                    Some(rhs_blob.id_as_string()),
+                    writer,
+                )?;
+            }
+            status::ChangeType::Deleted => {
+                let lhs_blob = lhs_object_resolver.find_blob_by_path(&change.path)?;
+                let lhs_blob_lines: Vec<String> = bytes_to_lines(lhs_blob.content())?;
+                diff_content(
+                    &change.path,
+                    &lhs_blob_lines,
+                    Some(lhs_blob.id_as_string()),
+                    &[],
+                    None,
+                    writer,
+                )?;
+            }
+            status::ChangeType::Modified => {
+                let lhs_blob = lhs_object_resolver.find_blob_by_path(&change.path)?;
+                let lhs_blob_lines = bytes_to_lines(lhs_blob.content())?;
+                let rhs_blob = rhs_object_resolver.find_blob_by_path(&change.path)?;
+                let rhs_blob_lines = bytes_to_lines(rhs_blob.content())?;
+                diff_content(
+                    &change.path,
+                    &lhs_blob_lines,
+                    Some(lhs_blob.id_as_string()),
+                    &rhs_blob_lines,
+                    Some(rhs_blob.id_as_string()),
+                    writer,
+                )?;
+            }
+        }
     }
 
     Ok(())
@@ -684,14 +739,12 @@ pub fn compare_trees(
     prefix: PathBuf,
     lhs_resolver: &mut ObjectResolver,
     rhs_resolver: &mut ObjectResolver,
-) -> io::Result<(Vec<PathBuf>, Vec<PathBuf>, Vec<PathBuf>)> {
+) -> io::Result<Vec<status::Change>> {
     if lhs == rhs {
-        return Ok((Vec::new(), Vec::new(), Vec::new()));
+        return Ok(Vec::new());
     }
 
-    let mut deleted: Vec<PathBuf> = Vec::new();
-    let mut added: Vec<PathBuf> = Vec::new();
-    let mut changed: Vec<PathBuf> = Vec::new();
+    let mut changes: Vec<status::Change> = Vec::new();
 
     let lhs_entries: Vec<&TreeEntry> = lhs
         .as_ref()
@@ -714,30 +767,36 @@ pub fn compare_trees(
             if lhs_entry.name == rhs_entry.name {
                 if lhs_entry.object_id != rhs_entry.object_id {
                     if lhs_entry.mode == FileMode::Regular && rhs_entry.mode == FileMode::Regular {
-                        changed.push(prefix.join(&lhs_entry.name));
+                        changes.push(status::Change {
+                            path: prefix.join(&lhs_entry.name),
+                            change_type: status::ChangeType::Modified,
+                            changed_in: status::ChangePlace::Worktree, // FIXME this is wrong
+                        });
                         continue 'outer;
                     }
 
                     let lhs_entry_tree = get_subtree(lhs_entry, lhs_resolver);
                     let rhs_entry_tree = get_subtree(rhs_entry, rhs_resolver);
 
-                    let (sub_deletions, sub_additions, sub_changes) = compare_trees(
+                    let sub_changes = compare_trees(
                         rhs_entry_tree,
                         lhs_entry_tree,
                         prefix.join(&lhs_entry.name),
                         lhs_resolver,
                         rhs_resolver,
                     )?;
-                    deleted.extend(sub_deletions);
-                    added.extend(sub_additions);
-                    changed.extend(sub_changes);
+                    changes.extend(sub_changes);
                 }
 
                 continue 'outer;
             }
         }
 
-        deleted.push(prefix.join(&lhs_entry.name));
+        changes.push(status::Change {
+            path: prefix.join(&lhs_entry.name),
+            change_type: status::ChangeType::Deleted,
+            changed_in: status::ChangePlace::Worktree, // FIXME this is wrong
+        });
     }
 
     'outer: for rhs_entry in rhs_entries.iter() {
@@ -747,10 +806,14 @@ pub fn compare_trees(
             }
         }
 
-        added.push(prefix.join(&rhs_entry.name))
+        changes.push(status::Change {
+            path: prefix.join(&rhs_entry.name),
+            change_type: status::ChangeType::Created,
+            changed_in: status::ChangePlace::Worktree, // FIXME this is wrong
+        });
     }
 
-    return Ok((deleted, added, changed));
+    return Ok(changes);
 }
 
 #[cfg(test)]

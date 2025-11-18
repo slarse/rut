@@ -28,6 +28,7 @@ fn internal_main() -> i32 {
                 .expect("Failed to write to stdout");
             1
         }
+        Err(rut::Error::Clap(err)) => err.exit(),
         err @ Err(_) => panic!("something went horribly wrong: {:?}", err),
     }
 }
