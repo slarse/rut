@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     fmt::{Debug, Display},
     fs,
     io::{self, BufRead},
@@ -760,20 +761,19 @@ pub fn compare_trees(
         }
     };
 
-    // TODO fix performance, this is O(len(lhs_entries)*len(rhs_entries))
-    'outer: for lhs_entry in lhs_entries.iter() {
-        for rhs_entry in rhs_entries.iter() {
-            if lhs_entry.name == rhs_entry.name {
-                if lhs_entry.object_id != rhs_entry.object_id {
-                    if lhs_entry.mode == FileMode::Regular && rhs_entry.mode == FileMode::Regular {
-                        changes.push(status::Change {
-                            path: prefix.join(&lhs_entry.name),
-                            change_type: status::ChangeType::Modified,
-                            changed_in: status::ChangePlace::Worktree, // FIXME this is wrong
-                        });
-                        continue 'outer;
-                    }
+    let mut rhs_entries_by_name: HashMap<&str, &TreeEntry> = HashMap::new();
+    for rhs_entry in rhs_entries.iter() {
+        rhs_entries_by_name.insert(rhs_entry.name.as_str(), rhs_entry);
+    }
 
+    let mut lhs_entries_by_name: HashMap<&str, &TreeEntry> = HashMap::new();
+
+    for lhs_entry in lhs_entries.iter() {
+        lhs_entries_by_name.insert(lhs_entry.name.as_str(), lhs_entry);
+
+        if let Some(rhs_entry) = rhs_entries_by_name.get(lhs_entry.name.as_str()) {
+            if lhs_entry.object_id != rhs_entry.object_id || lhs_entry.mode != rhs_entry.mode {
+                if lhs_entry.mode == FileMode::Directory || rhs_entry.mode == FileMode::Directory {
                     let lhs_entry_tree = get_subtree(lhs_entry, lhs_resolver);
                     let rhs_entry_tree = get_subtree(rhs_entry, rhs_resolver);
 
@@ -785,10 +785,16 @@ pub fn compare_trees(
                         rhs_resolver,
                     )?;
                     changes.extend(sub_changes);
+                } else {
+                    changes.push(status::Change {
+                        path: prefix.join(&lhs_entry.name),
+                        change_type: status::ChangeType::Modified,
+                        changed_in: status::ChangePlace::Worktree, // FIXME this is wrong
+                    });
                 }
-
-                continue 'outer;
             }
+
+            continue;
         }
 
         changes.push(status::Change {
@@ -798,11 +804,10 @@ pub fn compare_trees(
         });
     }
 
-    'outer: for rhs_entry in rhs_entries.iter() {
-        for lhs_entry in lhs_entries.iter() {
-            if lhs_entry.name == rhs_entry.name {
-                continue 'outer;
-            }
+    for rhs_entry in rhs_entries.iter() {
+        if lhs_entries_by_name.get(rhs_entry.name.as_str()).is_some() {
+            // We've already handled matching names in the prior loop
+            continue;
         }
 
         changes.push(status::Change {
