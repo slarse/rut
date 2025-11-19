@@ -68,6 +68,7 @@ Rut currently supports the following subset of Git:
 * `diff`
     - Complete with context lines, chunk headers and color output!
     - Accepts the `--cached` flag to compare the index to the last commit
+    - Optionally takes two refs to compare them
 * `restore`
     - Restores a single file in the worktree
     - Accepts the `--source` option that takes a reference (defaults to HEAD)
