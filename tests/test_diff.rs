@@ -194,6 +194,58 @@ index 9649cde..0000000
     Ok(())
 }
 
+/// When diffing with just a single ref, the behavior should be to diff the worktree against said
+/// ref. The easiest way to test that is to have both staged and unstaged changes and diff against
+/// HEAD. All changes should then show up.
+#[test]
+#[ignore]
+fn test_diff_ref() -> rut::Result<()> {
+    // arrange
+    let repository = rut_testhelpers::create_repository();
+    let filename = String::from("file.txt");
+    let file = repository.worktree().root().join(&filename);
+
+    fs::write(&file, "First")?;
+    rut_testhelpers::rut_add(&file, &repository);
+    let commit_id = rut_testhelpers::rut_commit("First", &repository)?;
+    let committed_blob_id = get_blob_short_id("First");
+
+    fs::write(&file, "Second")?;
+    let unstaged_blob_id = get_blob_short_id("Second");
+
+    let staged_filename = String::from("other-file.txt");
+    let staged_file = repository.worktree().root().join(&staged_filename);
+    fs::write(&staged_file, "Other")?;
+    rut_testhelpers::rut_add(&staged_file, &repository);
+    let staged_blob_id = get_blob_short_id("Other");
+
+    // act
+    let output = rut_testhelpers::run_command_string(format!("diff {commit_id}"), &repository)?;
+
+    // assert
+    let expected_output = format!(
+        "diff --git a/{filename} b/{filename}
+index {committed_blob_id}..{unstaged_blob_id}
+--- a/{filename}
++++ b/{filename}
+@@ -1 +1 @@
+-First
++Second
+
+diff git a/{staged_filename} b/{staged_filename}
+index {staged_blob_id}..000000
+--- a/{staged_filename}
++++ b/{staged_filename}
+@@ 0 +1 @@
++ Other
+"
+    );
+
+    assert_eq!(output, expected_output);
+
+    Ok(())
+}
+
 #[test]
 fn test_diff_refs() -> rut::Result<()> {
     // arrange
@@ -224,6 +276,7 @@ fn test_diff_refs() -> rut::Result<()> {
         &repository,
     )?;
 
+    // assert
     let expected_output_forward = format!(
         "diff --git a/file.txt b/file.txt
 index {first_blob_id}..{second_blob_id}
@@ -296,4 +349,8 @@ fn create_expected_header<P: AsRef<Path>>(filepath: P, old_blob: &Blob, new_blob
         filepath.as_ref().display(),
         filepath.as_ref().display(),
     )
+}
+
+fn get_blob_short_id(content: &str) -> String {
+    rut::objects::Blob::new(content.as_bytes().to_vec()).short_id_as_string()
 }
