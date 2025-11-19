@@ -46,3 +46,5 @@ pub mod revparse;
 pub mod error;
 
 pub use crate::error::{Error, Result};
+
+pub mod switch;

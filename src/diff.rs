@@ -805,7 +805,7 @@ pub fn compare_trees(
     }
 
     for rhs_entry in rhs_entries.iter() {
-        if lhs_entries_by_name.get(rhs_entry.name.as_str()).is_some() {
+        if lhs_entries_by_name.contains_key(rhs_entry.name.as_str()) {
             // We've already handled matching names in the prior loop
             continue;
         }

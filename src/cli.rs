@@ -4,8 +4,9 @@ use std::io::{Error, Write};
 use std::os::unix::io::AsRawFd;
 
 use crate::output::{Color, OutputWriter, Style};
+use crate::switch::WorktreeEdit;
 use crate::{add, commit, diff, init, log, restore, rm, status, workspace::Repository};
-use crate::{branch, revparse};
+use crate::{branch, revparse, switch};
 use std::io;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
@@ -63,6 +64,14 @@ enum Action {
     RevParse {
         revision: String,
     },
+    Switch {
+        #[arg(short = 'd', long, required = true)]
+        detach: bool,
+        #[arg(short = 'p', long, required = true)]
+        plan: bool,
+
+        start_point: String,
+    },
 }
 
 pub fn run_command<P: AsRef<Path>, S: Into<OsString> + Clone>(
@@ -112,12 +121,17 @@ pub fn run_command<P: AsRef<Path>, S: Into<OsString> + Clone>(
                 // Currently, if reference is specified, we require the other reference also to be
                 // specified.
                 let Some(other_reference) = other_reference else {
-                    let mut cmd = Arguments::command();
-                    let error = cmd.error(
+                    return clap_error(
                         clap::error::ErrorKind::ArgumentConflict,
                         "must provide [other_reference] if [reference] is provided",
                     );
-                    return Err(crate::error::Error::Clap(error));
+                };
+
+                if cached {
+                    return clap_error(
+                        clap::error::ErrorKind::ArgumentConflict,
+                        "--cached with explicit references is not supported",
+                    );
                 };
 
                 return diff::diff_refs(&repository, reference, other_reference, writer);
@@ -161,9 +175,42 @@ pub fn run_command<P: AsRef<Path>, S: Into<OsString> + Clone>(
         Action::RevParse { revision } => {
             revparse::rev_parse(&revision, writer, &repository)?;
         }
+        Action::Switch {
+            detach,
+            plan,
+            start_point,
+        } => {
+            if !detach || !plan {
+                return clap_error(
+                    clap::error::ErrorKind::MissingRequiredArgument,
+                    "--detach and --plan are currently required",
+                );
+            }
+
+            let changes = switch::plan_switch(&repository, "HEAD", &start_point)?;
+            for change in changes {
+                match change {
+                    WorktreeEdit::Add(path) => {
+                        writer.writeln(format!("ADD {}", path.to_str().unwrap()))?
+                    }
+                    WorktreeEdit::Update(path) => {
+                        writer.writeln(format!("UPDATE {}", path.to_str().unwrap()))?
+                    }
+                    WorktreeEdit::Delete(path) => {
+                        writer.writeln(format!("DELETE {}", path.to_str().unwrap()))?
+                    }
+                };
+            }
+        }
     }
 
     Ok(())
+}
+
+fn clap_error(kind: clap::error::ErrorKind, msg: &str) -> crate::Result<()> {
+    let mut cmd = Arguments::command();
+    let error = cmd.error(kind, msg);
+    Err(crate::error::Error::Clap(error))
 }
 
 pub struct StdoutWriter {
